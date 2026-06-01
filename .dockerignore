@@ -1,0 +1,43 @@
+.git
+.next
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env
+.env.*
+!.env.example
+
+# backups / data
+backups
+exports
+data
+
+# build artifacts
+coverage
+*.tsbuildinfo
+
+# docker files (not needed inside container)
+Dockerfile
+docker-compose.yml
+docker-compose.override.yml
+
+# documentation
+README.md
+AGENTS.md
+CLAUDE.md
+AUTH_INSPECTION.md
+DATABASE_INSPECTION.md
+FUNCTIONS_INSPECTION.md
+MESSAGING_INSPECTION.md
+STORAGE_INSPECTION.md
+PROJECT_BRIEF.md
+DEPLOYMENT.md
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
