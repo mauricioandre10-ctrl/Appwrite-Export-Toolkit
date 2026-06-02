@@ -1,6 +1,6 @@
 import "dotenv/config";
 
-import { mkdirSync } from "node:fs";
+import { mkdirSync, accessSync } from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 
@@ -17,6 +17,29 @@ const envSchema = z.object({
 
 export type AppwriteConfig = z.infer<typeof envSchema>;
 
+function resolveBackupDir(configuredDir: string): string {
+  const resolved = path.resolve(configuredDir);
+
+  try {
+    mkdirSync(resolved, { recursive: true });
+    accessSync(resolved);
+    return resolved;
+  } catch {
+    // Configured dir not writable (e.g. /data on localhost)
+  }
+
+  const fallback = path.resolve("./backups");
+  try {
+    mkdirSync(fallback, { recursive: true });
+    accessSync(fallback);
+    return fallback;
+  } catch {
+    // Last resort
+  }
+
+  return resolved;
+}
+
 export function loadAppwriteConfig(): AppwriteConfig {
   const result = envSchema.safeParse(process.env);
 
@@ -26,13 +49,34 @@ export function loadAppwriteConfig(): AppwriteConfig {
   }
 
   const config = result.data;
-  const backupDir = path.resolve(config.BACKUP_OUTPUT_DIR);
+  const backupDir = resolveBackupDir(config.BACKUP_OUTPUT_DIR);
 
-  try {
-    mkdirSync(backupDir, { recursive: true });
-  } catch {
-    // Directory may already exist or permissions may be restricted
+  return { ...config, BACKUP_OUTPUT_DIR: backupDir };
+}
+
+export function loadTargetConfig(): AppwriteConfig {
+  const result = envSchema.safeParse(process.env);
+
+  if (!result.success) {
+    const issues = result.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
+    throw new Error(`Invalid Appwrite environment config: ${issues}`);
   }
 
-  return config;
+  const config = result.data;
+  const backupDir = resolveBackupDir(config.BACKUP_OUTPUT_DIR);
+
+  if (!config.APPWRITE_TARGET_ENDPOINT || !config.APPWRITE_TARGET_PROJECT_ID || !config.APPWRITE_TARGET_API_KEY) {
+    throw new Error(
+      "Variables APPWRITE_TARGET_ENDPOINT, APPWRITE_TARGET_PROJECT_ID y APPWRITE_TARGET_API_KEY son obligatorias para importar. " +
+      "No se permite importar al proyecto origen por seguridad."
+    );
+  }
+
+  return {
+    ...config,
+    APPWRITE_ENDPOINT: config.APPWRITE_TARGET_ENDPOINT,
+    APPWRITE_PROJECT_ID: config.APPWRITE_TARGET_PROJECT_ID,
+    APPWRITE_API_KEY: config.APPWRITE_TARGET_API_KEY,
+    BACKUP_OUTPUT_DIR: backupDir,
+  };
 }

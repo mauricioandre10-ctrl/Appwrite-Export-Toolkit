@@ -1,15 +1,18 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { createAppwriteServices } from "@/server/appwrite/client";
-import { loadAppwriteConfig } from "@/server/appwrite/config";
+import { loadAppwriteConfig, loadTargetConfig } from "@/server/appwrite/config";
 import type { BackupSummary } from "@/server/backups/catalog";
 import { LoadingSubmitButton, LoginSubmitButton } from "./loading-button";
 import { listBackupSummaries, resolveManagedBackupPath } from "@/server/backups/catalog";
 import { exportBackup, parseExportSelection } from "@/server/exporters/export-orchestrator";
+import { importBackup, parseImportSelection } from "@/server/import/import-orchestrator";
 import { validateBackup } from "@/server/validators/backup-validator";
+import { deleteBackup, getBackupDeletionInfo, formatBytes } from "@/server/backups/delete-catalog";
 
 const sessionCookieName = "appwrite_export_toolkit_session";
 
@@ -19,10 +22,16 @@ type PageProps = {
     loggedOut?: string;
     exported?: string;
     exportModule?: string;
+    imported?: string;
+    importModule?: string;
+    importStatus?: string;
     validated?: string;
     validationErrors?: string;
     validationWarnings?: string;
     actionError?: string;
+    tab?: string;
+    deleteConfirm?: string;
+    deleted?: string;
   }>;
 };
 
@@ -82,9 +91,7 @@ function DashboardShell({
   params?: Awaited<PageProps["searchParams"]>;
 }) {
   const latest = backups[0];
-  const totalFiles = latest?.counts.files ?? 0;
-  const totalDocuments = latest?.counts.documents ?? 0;
-  const totalChecksums = latest?.checksums ?? 0;
+  const activeTab = params?.tab === "import" ? "import" : "export";
 
   return (
     <main className="min-h-screen bg-[#071015] text-slate-50">
@@ -104,47 +111,160 @@ function DashboardShell({
           </div>
         </header>
 
-        <section className="grid gap-5 py-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="rounded-[2rem] border border-white/10 bg-slate-950/50 p-6 shadow-2xl shadow-black/20">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold tracking-[0.24em] text-emerald-200 uppercase">
-                  Centro de control
-                </p>
-                <h1 className="mt-3 max-w-2xl text-4xl font-black tracking-tight text-white sm:text-5xl">
-                  Exports Appwrite listos para volumen persistente.
-                </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                  Lanza backups por modulo, valida integridad y revisa estado por recurso sin salir del panel.
-                </p>
-              </div>
-              <StatusPill status={latest?.moduleStatus.functions === "partial" ? "partial" : "complete"} />
-            </div>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <DashboardMetric label="Backups" value={String(backups.length)} tone="emerald" />
-              <DashboardMetric label="Documentos" value={String(totalDocuments)} tone="blue" />
-              <DashboardMetric label="Archivos" value={String(totalFiles)} tone="violet" />
-            </div>
-
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
-              <DashboardMetric label="Checksums" value={String(totalChecksums)} tone="amber" />
-              <DashboardMetric label="Funciones" value={String(latest?.counts.functions ?? 0)} tone="rose" />
-              <DashboardMetric label="Storage" value={latest?.moduleStatus.storage ?? "sin datos"} tone="slate" />
-            </div>
-          </div>
-
-          <ActionPanel configError={configError} />
-        </section>
+        <AppBar activeTab={activeTab} />
 
         <AlertPanel params={params} configError={configError} />
 
-        <section className="grid gap-5 pb-8 lg:grid-cols-[0.95fr_1.05fr]">
-          <LatestBackupCard backup={latest} />
-          <BackupHistory backups={backups} />
-        </section>
+        {activeTab === "import" ? (
+          <ImportSection backups={backups} configError={configError} params={params} />
+        ) : (
+          <ExportSection backups={backups} latest={latest} configError={configError} />
+        )}
+
+        {params?.deleteConfirm !== undefined ? (
+          <DeleteConfirmModal backupId={params.deleteConfirm} />
+        ) : null}
+
+        {params?.deleted !== undefined ? (
+          <PanelAlert tone="success" title="Backup eliminado" message={`Backup ${params.deleted} eliminado correctamente.`} />
+        ) : null}
       </div>
     </main>
+  );
+}
+
+function AppBar({ activeTab }: { activeTab: "export" | "import" }) {
+  return (
+    <nav className="mt-5 flex gap-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
+      <Link
+        href="/?tab=export"
+        className={`flex-1 rounded-xl px-5 py-3 text-center text-sm font-bold transition ${
+          activeTab === "export"
+            ? "bg-emerald-300 text-slate-950"
+            : "text-slate-300 hover:bg-white/10"
+        }`}
+      >
+        <span className="flex items-center justify-center gap-2">
+          <ExportIcon /> Export
+        </span>
+      </Link>
+      <Link
+        href="/?tab=import"
+        className={`flex-1 rounded-xl px-5 py-3 text-center text-sm font-bold transition ${
+          activeTab === "import"
+            ? "bg-sky-300 text-slate-950"
+            : "text-slate-300 hover:bg-white/10"
+        }`}
+      >
+        <span className="flex items-center justify-center gap-2">
+          <ImportIcon /> Import
+        </span>
+      </Link>
+    </nav>
+  );
+}
+
+function ExportSection({
+  backups,
+  latest,
+  configError,
+}: {
+  backups: BackupSummary[];
+  latest: BackupSummary | undefined;
+  configError: string | null;
+  params?: Awaited<PageProps["searchParams"]>;
+}) {
+  const totalFiles = latest?.counts.files ?? 0;
+  const totalDocuments = latest?.counts.documents ?? 0;
+  const totalChecksums = latest?.checksums ?? 0;
+
+  return (
+    <>
+      <section className="grid gap-5 py-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-[2rem] border border-white/10 bg-slate-950/50 p-6 shadow-2xl shadow-black/20">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold tracking-[0.24em] text-emerald-200 uppercase">
+                Centro de control
+              </p>
+              <h1 className="mt-3 max-w-2xl text-4xl font-black tracking-tight text-white sm:text-5xl">
+                Exports Appwrite listos para volumen persistente.
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                Lanza backups por modulo, valida integridad y revisa estado por recurso sin salir del panel.
+              </p>
+            </div>
+            <StatusPill status={latest?.moduleStatus.functions === "partial" ? "partial" : "complete"} />
+          </div>
+
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <DashboardMetric label="Backups" value={String(backups.length)} tone="emerald" />
+            <DashboardMetric label="Documentos" value={String(totalDocuments)} tone="blue" />
+            <DashboardMetric label="Archivos" value={String(totalFiles)} tone="violet" />
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <DashboardMetric label="Checksums" value={String(totalChecksums)} tone="amber" />
+            <DashboardMetric label="Funciones" value={String(latest?.counts.functions ?? 0)} tone="rose" />
+            <DashboardMetric label="Storage" value={latest?.moduleStatus.storage ?? "sin datos"} tone="slate" />
+          </div>
+        </div>
+
+        <ActionPanel configError={configError} />
+      </section>
+
+      <section className="grid gap-5 pb-8 lg:grid-cols-[0.95fr_1.05fr]">
+        <LatestBackupCard backup={latest} />
+        <BackupHistory backups={backups} />
+      </section>
+    </>
+  );
+}
+
+function ImportSection({
+  backups,
+  configError,
+  params,
+}: {
+  backups: BackupSummary[];
+  configError: string | null;
+  params?: Awaited<PageProps["searchParams"]>;
+}) {
+  return (
+    <>
+      <section className="grid gap-5 py-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="rounded-[2rem] border border-white/10 bg-slate-950/50 p-6 shadow-2xl shadow-black/20">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold tracking-[0.24em] text-sky-200 uppercase">
+                Restore / Import
+              </p>
+              <h1 className="mt-3 max-w-2xl text-4xl font-black tracking-tight text-white sm:text-5xl">
+                Importa backups a otro Appwrite.
+              </h1>
+              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
+                Selecciona un backup y los modulos a restaurar. Los IDs se remapean automaticamente.
+              </p>
+            </div>
+            <div className="rounded-full bg-sky-300/20 px-4 py-2 text-sm font-bold text-sky-200">
+              Restore order: auth → messaging → databases → storage → functions
+            </div>
+          </div>
+
+          <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <DashboardMetric label="Modulos" value="5" tone="sky" />
+            <DashboardMetric label="Orden" value="Secuencial" tone="blue" />
+            <DashboardMetric label="Remapeo" value="Auto" tone="emerald" />
+          </div>
+        </div>
+
+        <ImportPanel backups={backups} configError={configError} />
+      </section>
+
+      {params?.imported !== undefined ? (
+        <ImportResultAlert params={params} />
+      ) : null}
+    </>
   );
 }
 
@@ -171,6 +291,72 @@ function ActionPanel({ configError }: { configError: string | null }) {
           </form>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ImportPanel({ backups, configError }: { backups: BackupSummary[]; configError: string | null }) {
+  const modules = ["all", "auth", "messaging", "databases", "storage", "functions"];
+
+  return (
+    <div className="rounded-[2rem] border border-white/10 bg-white/[0.07] p-6 shadow-2xl shadow-black/30 backdrop-blur-xl">
+      <p className="text-sm font-semibold tracking-[0.24em] text-sky-200 uppercase">Restore</p>
+      <h2 className="mt-3 text-2xl font-black text-white">Importar backup</h2>
+      <p className="mt-2 text-sm leading-6 text-slate-300">
+        Selecciona el backup y los modulos a restaurar. El orden de restore es automatico.
+      </p>
+
+      <form action={importAction} className="mt-6 space-y-4">
+        <label className="block">
+          <span className="text-sm font-medium text-slate-200">Backup</span>
+          <select
+            name="backupId"
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-sky-300/60"
+            required
+          >
+            <option value="">Seleccionar backup...</option>
+            {backups.map((b) => (
+              <option key={b.backupId} value={b.backupId}>
+                {b.backupId} — {formatDate(b.exportedAt)}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="text-sm font-medium text-slate-200">Modulos</span>
+          <select
+            name="module"
+            className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-sky-300/60"
+          >
+            {modules.map((m) => (
+              <option key={m} value={m}>
+                {m === "all" ? "Todos (restore order automatico)" : m}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <LoadingSubmitButton label="Importar backup" module="import" disabled={configError !== null} />
+      </form>
+    </div>
+  );
+}
+
+function ImportResultAlert({ params }: { params: Awaited<PageProps["searchParams"]> }) {
+  const status = params?.importStatus ?? "complete";
+  const tone = status === "failed" ? "error" : status === "partial" ? "warning" : "success";
+
+  return (
+    <div className={`mb-6 rounded-[1.5rem] border p-4 ${
+      tone === "success" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" :
+      tone === "warning" ? "border-amber-300/20 bg-amber-300/10 text-amber-100" :
+      "border-red-300/20 bg-red-300/10 text-red-100"
+    }`}>
+      <p className="font-bold">Import {status}</p>
+      <p className="mt-1 text-sm opacity-85">
+        Backup {params?.imported} importado al modulo {params?.importModule ?? "all"}.
+      </p>
     </div>
   );
 }
@@ -318,6 +504,15 @@ function BackupHistory({ backups }: { backups: BackupSummary[] }) {
                   <input name="backupId" type="hidden" value={backup.backupId} />
                   <SubmitButton label="Validar" icon="check" compact />
                 </form>
+                <form action={deleteConfirmAction}>
+                  <input name="backupId" type="hidden" value={backup.backupId} />
+                  <button
+                    type="submit"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-red-300/30 bg-red-300/10 px-3 py-2 text-xs font-bold text-red-200 transition hover:bg-red-300/20"
+                  >
+                    <TrashIcon /> Eliminar
+                  </button>
+                </form>
               </div>
             </div>
             <div className="mt-3">
@@ -438,10 +633,34 @@ function LogEntryRow({ entry }: { entry: import("@/server/backups/catalog").Back
   );
 }
 
+function ExportIcon() {
+  return (
+    <svg className="size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2v9M4.5 7.5 8 11l3.5-3.5M3 13h10" />
+    </svg>
+  );
+}
+
+function ImportIcon() {
+  return (
+    <svg className="size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 14V5M4.5 8.5 8 5l3.5 3.5M3 3h10" />
+    </svg>
+  );
+}
+
 function DownloadIcon() {
   return (
     <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8 2v9M4.5 7.5 8 11l3.5-3.5M3 13h10" />
+    </svg>
+  );
+}
+
+function TrashIcon() {
+  return (
+    <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 4h12M5.333 4V2.667a1.333 1.333 0 0 1 1.334-1.334h2.666a1.333 1.333 0 0 1 1.334 1.334V4m2 0v9.333a1.333 1.333 0 0 1-1.334 1.334H4.667a1.333 1.333 0 0 1-1.334-1.334V4h9.334Z" />
     </svg>
   );
 }
@@ -534,6 +753,7 @@ function DashboardMetric({ label, value, tone }: { label: string; value: string;
     violet: "border-violet-300/20 bg-violet-300/10 text-violet-100",
     amber: "border-amber-300/20 bg-amber-300/10 text-amber-100",
     rose: "border-rose-300/20 bg-rose-300/10 text-rose-100",
+    sky: "border-sky-300/20 bg-sky-300/10 text-sky-100",
     slate: "border-white/10 bg-white/[0.06] text-slate-100",
   }[tone] ?? "border-white/10 bg-white/[0.06] text-slate-100";
 
@@ -572,6 +792,81 @@ function InlineNotice({ tone, message }: { tone: "success" | "warning" | "error"
   }[tone];
 
   return <div className={`mt-6 rounded-2xl border p-4 text-sm ${toneClass}`}>{message}</div>;
+}
+
+async function DeleteConfirmModal({ backupId }: { backupId: string }) {
+  let info;
+  try {
+    const config = loadAppwriteConfig();
+    info = await getBackupDeletionInfo(config.BACKUP_OUTPUT_DIR, backupId);
+  } catch {
+    return <PanelAlert tone="error" title="Error" message={`No se encontro el backup ${backupId}.`} />;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-lg rounded-[2rem] border border-red-300/30 bg-slate-950 p-8 shadow-2xl shadow-red-900/30">
+        <div className="flex items-center gap-3">
+          <div className="grid size-10 place-items-center rounded-full bg-red-400/20">
+            <TrashIcon />
+          </div>
+          <div>
+            <p className="text-sm font-semibold tracking-[0.24em] text-red-200 uppercase">Eliminar backup</p>
+            <p className="text-xs text-slate-400">Esta accion no se puede deshacer</p>
+          </div>
+        </div>
+
+        <div className="mt-6 space-y-3 rounded-2xl border border-white/10 bg-white/[0.04] p-5">
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Backup</span>
+            <span className="font-mono text-white">{info.backupId}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Fecha</span>
+            <span className="text-white">{new Date(info.exportedAt).toLocaleString("es-ES")}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Proyecto</span>
+            <span className="font-mono text-white">{info.projectId}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Modulos</span>
+            <span className="text-white">{info.modules.join(", ")}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Archivos</span>
+            <span className="text-white">{info.fileCount}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-slate-400">Tamano</span>
+            <span className="font-bold text-red-200">{formatBytes(info.totalSizeBytes)}</span>
+          </div>
+        </div>
+
+        <p className="mt-4 text-sm text-red-300/80">
+          Se eliminaran permanentemente <strong>{info.fileCount} archivos</strong> ({formatBytes(info.totalSizeBytes)}).
+        </p>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <Link
+            href="/"
+            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-center text-sm font-bold text-white transition hover:bg-white/10"
+          >
+            Cancelar
+          </Link>
+          <form action={deleteAction} className="flex-1">
+            <input name="backupId" type="hidden" value={backupId} />
+            <button
+              type="submit"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-red-300/40 bg-red-400/20 px-5 font-bold text-red-200 transition hover:bg-red-400/30"
+            >
+              <TrashIcon /> Eliminar permanentemente
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function formatDate(value: string): string {
@@ -648,6 +943,58 @@ async function validateAction(formData: FormData) {
   redirect(
     `/?validated=${encodeURIComponent(backupId)}&validationErrors=${errors}&validationWarnings=${warnings}`,
   );
+}
+
+async function importAction(formData: FormData) {
+  "use server";
+
+  await requireAuthenticated();
+
+  const backupId = String(formData.get("backupId") ?? "");
+  const moduleName = String(formData.get("module") ?? "all");
+  let status = "complete";
+
+  try {
+    const config = loadTargetConfig();
+    const services = createAppwriteServices(config);
+    const selection = parseImportSelection(moduleName);
+    const result = await importBackup({ selection, config, services, backupPath: backupId });
+    status = result.status;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.slice(0, 80).replaceAll(" ", "_") : "import_failed";
+    redirect(`/?actionError=${encodeURIComponent(reason)}&tab=import`);
+  }
+
+  redirect(
+    `/?imported=${encodeURIComponent(backupId)}&importModule=${encodeURIComponent(moduleName)}&importStatus=${status}&tab=import`,
+  );
+}
+
+async function deleteConfirmAction(formData: FormData) {
+  "use server";
+
+  await requireAuthenticated();
+
+  const backupId = String(formData.get("backupId") ?? "");
+  redirect(`/?deleteConfirm=${encodeURIComponent(backupId)}`);
+}
+
+async function deleteAction(formData: FormData) {
+  "use server";
+
+  await requireAuthenticated();
+
+  const backupId = String(formData.get("backupId") ?? "");
+
+  try {
+    const config = loadAppwriteConfig();
+    await deleteBackup(config.BACKUP_OUTPUT_DIR, backupId);
+  } catch (error) {
+    const reason = error instanceof Error ? error.message.slice(0, 80).replaceAll(" ", "_") : "delete_failed";
+    redirect(`/?actionError=${encodeURIComponent(reason)}`);
+  }
+
+  redirect(`/?deleted=${encodeURIComponent(backupId)}`);
 }
 
 async function loginAction(formData: FormData) {

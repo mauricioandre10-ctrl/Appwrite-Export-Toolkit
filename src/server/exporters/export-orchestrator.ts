@@ -6,6 +6,7 @@ import { ExportJobLogger } from "../backup/export-job-logger";
 import { BackupWriter } from "../backup/backup-writer";
 import { collectFileChecksums } from "../backup/checksum-service";
 import { createBackupId, resolveBackupRoot } from "../backup/paths";
+import type { ExportModule } from "../backup/paths";
 import { createInitialManifest } from "../manifest/manifest-service";
 import type { BackupCounts, BackupModule } from "../types/backup";
 import { exportAuth } from "./auth-exporter";
@@ -35,7 +36,7 @@ export async function exportBackup(input: {
   config: AppwriteConfig;
   services: AppwriteServices;
 }): Promise<BackupExportSummary> {
-  const backupId = createBackupId(input.config.APPWRITE_PROJECT_ID);
+  const backupId = createBackupId(input.config.APPWRITE_PROJECT_ID, new Date(), input.selection as ExportModule);
   const backupRoot = resolveBackupRoot(input.config.BACKUP_OUTPUT_DIR, backupId);
   const writer = new BackupWriter(backupRoot);
   const jobLogger = new ExportJobLogger(backupRoot);
