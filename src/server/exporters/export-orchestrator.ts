@@ -9,14 +9,13 @@ import { createBackupId, resolveBackupRoot } from "../backup/paths";
 import type { ExportModule } from "../backup/paths";
 import { createInitialManifest } from "../manifest/manifest-service";
 import type { BackupCounts, BackupModule } from "../types/backup";
+import { updateJob, completeJob } from "../import/progress-store";
 import { exportAuth } from "./auth-exporter";
 import { exportDatabases } from "./database-exporter";
-import { exportFunctions } from "./functions-exporter";
-import { exportMessaging } from "./messaging-exporter";
 import { exportStorage } from "./storage-exporter";
 import type { ModuleExportResult } from "./types";
 
-export const exportableModules = ["auth", "messaging", "databases", "storage", "functions"] as const;
+export const exportableModules = ["auth", "databases", "storage"] as const;
 
 export type ExportableModule = (typeof exportableModules)[number];
 
@@ -31,10 +30,32 @@ export type BackupExportSummary = {
   manifestPath: string;
 };
 
+const EXPORT_WEIGHTS: Record<string, number> = {
+  auth: 20,
+  databases: 60,
+  storage: 20,
+};
+
+function computeExportPercent(modules: ExportableModule[], completedIndex: number): number {
+  if (modules.length === 0) return 0;
+  let weightSum = 0;
+  let completedWeight = 0;
+  for (let i = 0; i < modules.length; i++) {
+    const w = EXPORT_WEIGHTS[modules[i]!] ?? 10;
+    weightSum += w;
+    if (i < completedIndex) {
+      completedWeight += w;
+    }
+  }
+  return Math.round((completedWeight / weightSum) * 100);
+}
+
 export async function exportBackup(input: {
   selection: ExportSelection;
   config: AppwriteConfig;
   services: AppwriteServices;
+  jobId?: string;
+  onProgress?: (percent: number, phase: string, module: string) => void;
 }): Promise<BackupExportSummary> {
   const backupId = createBackupId(input.config.APPWRITE_PROJECT_ID, new Date(), input.selection as ExportModule);
   const backupRoot = resolveBackupRoot(input.config.BACKUP_OUTPUT_DIR, backupId);
@@ -42,6 +63,11 @@ export async function exportBackup(input: {
   const jobLogger = new ExportJobLogger(backupRoot);
   await writer.ensureDir();
   await jobLogger.info("Export started", { backupId, selection: input.selection });
+
+  if (input.jobId !== undefined) {
+    await updateJob(input.jobId, { status: "running", phase: "initializing", module: "", percent: 0 });
+  }
+  input.onProgress?.(0, "initializing", "");
 
   const modules = resolveModules(input.selection);
   const results: ModuleExportResult[] = [];
@@ -60,8 +86,15 @@ export async function exportBackup(input: {
     backupId,
   });
 
-  for (const moduleName of modules) {
+  for (let i = 0; i < modules.length; i++) {
+    const moduleName = modules[i]!;
     await jobLogger.info("Module export started", { module: moduleName });
+
+    if (input.jobId !== undefined) {
+      const percent = computeExportPercent(modules, i);
+      await updateJob(input.jobId, { status: "running", phase: "exporting", module: moduleName, percent });
+    }
+    input.onProgress?.(computeExportPercent(modules, i), "exporting", moduleName);
 
     try {
       const result = await runModuleExport(moduleName, input.config, input.services, writer);
@@ -90,11 +123,17 @@ export async function exportBackup(input: {
   manifest.warnings = results.flatMap((result) => result.warnings);
   manifest.moduleStatus = Object.fromEntries(results.map((result) => [result.module, result.status]));
   await jobLogger.info("Export finalizing", { backupId, moduleStatus: manifest.moduleStatus });
+
+  if (input.jobId !== undefined) {
+    await updateJob(input.jobId, { status: "running", phase: "checksums", module: "", percent: 95 });
+  }
+  input.onProgress?.(95, "checksums", "");
+
   manifest.checksums = await collectFileChecksums(backupRoot);
 
   const manifestPath = await writer.writeJson("manifest.json", manifest);
 
-  return {
+  const summary: BackupExportSummary = {
     backupId,
     backupRoot,
     modules: manifest.modules,
@@ -102,6 +141,12 @@ export async function exportBackup(input: {
     warnings: manifest.warnings,
     manifestPath: path.relative(process.cwd(), manifestPath),
   };
+
+  if (input.jobId !== undefined) {
+    await completeJob(input.jobId, summary);
+  }
+
+  return summary;
 }
 
 export function parseExportSelection(value: string | undefined): ExportSelection {
@@ -133,14 +178,10 @@ async function runModuleExport(
   switch (moduleName) {
     case "auth":
       return exportAuth(services, writer);
-    case "messaging":
-      return exportMessaging(services, writer);
     case "databases":
       return exportDatabases(services, writer);
     case "storage":
       return exportStorage(config, services, writer);
-    case "functions":
-      return exportFunctions(config, services, writer);
   }
 }
 

@@ -13,7 +13,7 @@ export function createInitialManifest(input: {
     projectId: input.projectId,
     modules: [],
     counts: {},
-    restoreOrder: ["auth", "messaging", "databases", "storage", "functions"],
+    restoreOrder: ["auth", "databases", "storage"],
     warnings: [],
     checksums: {},
   };

@@ -4,15 +4,17 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { createAppwriteServices } from "@/server/appwrite/client";
-import { loadAppwriteConfig, loadTargetConfig } from "@/server/appwrite/config";
+import { loadAppwriteConfig } from "@/server/appwrite/config";
 import type { BackupSummary } from "@/server/backups/catalog";
-import { LoadingSubmitButton, LoginSubmitButton } from "./loading-button";
+import { LoginSubmitButton } from "./loading-button";
 import { listBackupSummaries, resolveManagedBackupPath } from "@/server/backups/catalog";
-import { exportBackup, parseExportSelection } from "@/server/exporters/export-orchestrator";
-import { importBackup, parseImportSelection } from "@/server/import/import-orchestrator";
 import { validateBackup } from "@/server/validators/backup-validator";
 import { deleteBackup, getBackupDeletionInfo, formatBytes } from "@/server/backups/delete-catalog";
+import { ExportPanel } from "@/components/export-panel";
+import { ImportPanel } from "@/components/import-panel";
+import { SchedulesPanel } from "@/components/schedules-panel";
+import { BackupWarnings } from "@/components/backup-warnings";
+import { PasswordInput } from "./password-input";
 
 const sessionCookieName = "appwrite_export_toolkit_session";
 
@@ -74,6 +76,8 @@ export default async function Home({ searchParams }: PageProps) {
             />
           </div>
         </section>
+
+        <Footer />
       </div>
     </main>
   );
@@ -91,7 +95,8 @@ function DashboardShell({
   params?: Awaited<PageProps["searchParams"]>;
 }) {
   const latest = backups[0];
-  const activeTab = params?.tab === "import" ? "import" : "export";
+  const activeTab: "export" | "import" | "schedules" =
+    params?.tab === "import" ? "import" : params?.tab === "schedules" ? "schedules" : "export";
 
   return (
     <main className="min-h-screen bg-[#071015] text-slate-50">
@@ -117,6 +122,8 @@ function DashboardShell({
 
         {activeTab === "import" ? (
           <ImportSection backups={backups} configError={configError} params={params} />
+        ) : activeTab === "schedules" ? (
+          <SchedulesSection />
         ) : (
           <ExportSection backups={backups} latest={latest} configError={configError} />
         )}
@@ -128,12 +135,14 @@ function DashboardShell({
         {params?.deleted !== undefined ? (
           <PanelAlert tone="success" title="Backup eliminado" message={`Backup ${params.deleted} eliminado correctamente.`} />
         ) : null}
+
+        <Footer />
       </div>
     </main>
   );
 }
 
-function AppBar({ activeTab }: { activeTab: "export" | "import" }) {
+function AppBar({ activeTab }: { activeTab: "export" | "import" | "schedules" }) {
   return (
     <nav className="mt-5 flex gap-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
       <Link
@@ -146,6 +155,18 @@ function AppBar({ activeTab }: { activeTab: "export" | "import" }) {
       >
         <span className="flex items-center justify-center gap-2">
           <ExportIcon /> Export
+        </span>
+      </Link>
+      <Link
+        href="/?tab=schedules"
+        className={`flex-1 rounded-xl px-5 py-3 text-center text-sm font-bold transition ${
+          activeTab === "schedules"
+            ? "bg-violet-300 text-slate-950"
+            : "text-slate-300 hover:bg-white/10"
+        }`}
+      >
+        <span className="flex items-center justify-center gap-2">
+          <ScheduleIcon /> Schedules
         </span>
       </Link>
       <Link
@@ -162,6 +183,10 @@ function AppBar({ activeTab }: { activeTab: "export" | "import" }) {
       </Link>
     </nav>
   );
+}
+
+function SchedulesSection() {
+  return <SchedulesPanel />;
 }
 
 function ExportSection({
@@ -182,19 +207,17 @@ function ExportSection({
     <>
       <section className="grid gap-5 py-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-[2rem] border border-white/10 bg-slate-950/50 p-6 shadow-2xl shadow-black/20">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold tracking-[0.24em] text-emerald-200 uppercase">
-                Centro de control
-              </p>
-              <h1 className="mt-3 max-w-2xl text-4xl font-black tracking-tight text-white sm:text-5xl">
-                Exports Appwrite listos para volumen persistente.
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                Lanza backups por modulo, valida integridad y revisa estado por recurso sin salir del panel.
-              </p>
-            </div>
-            <StatusPill status={latest?.moduleStatus.functions === "partial" ? "partial" : "complete"} />
+          <div>
+            <p className="text-sm font-semibold tracking-[0.24em] text-emerald-200 uppercase">
+              Centro de control
+            </p>
+            <h1 className="mt-3 max-w-lg text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
+              Exports Appwrite listos para volumen persistente.
+            </h1>
+            <p className="mt-3 max-w-lg text-sm leading-6 text-slate-300 sm:text-base">
+              Lanza backups por modulo, valida integridad y revisa estado por recurso sin salir del panel.
+            </p>
+            <StatusPill status={latest?.moduleStatus.databases === "partial" ? "partial" : "complete"} />
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -205,12 +228,12 @@ function ExportSection({
 
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <DashboardMetric label="Checksums" value={String(totalChecksums)} tone="amber" />
-            <DashboardMetric label="Funciones" value={String(latest?.counts.functions ?? 0)} tone="rose" />
+            <DashboardMetric label="Databases" value={latest?.moduleStatus.databases ?? "sin datos"} tone="slate" />
             <DashboardMetric label="Storage" value={latest?.moduleStatus.storage ?? "sin datos"} tone="slate" />
           </div>
         </div>
 
-        <ActionPanel configError={configError} />
+        <ExportPanel configError={configError} />
       </section>
 
       <section className="grid gap-5 pb-8 lg:grid-cols-[0.95fr_1.05fr]">
@@ -234,25 +257,23 @@ function ImportSection({
     <>
       <section className="grid gap-5 py-6 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="rounded-[2rem] border border-white/10 bg-slate-950/50 p-6 shadow-2xl shadow-black/20">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <p className="text-sm font-semibold tracking-[0.24em] text-sky-200 uppercase">
-                Restore / Import
-              </p>
-              <h1 className="mt-3 max-w-2xl text-4xl font-black tracking-tight text-white sm:text-5xl">
-                Importa backups a otro Appwrite.
-              </h1>
-              <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-300 sm:text-base">
-                Selecciona un backup y los modulos a restaurar. Los IDs se remapean automaticamente.
-              </p>
-            </div>
-            <div className="rounded-full bg-sky-300/20 px-4 py-2 text-sm font-bold text-sky-200">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.24em] text-sky-200 uppercase">
+              Restore / Import
+            </p>
+            <h1 className="mt-3 max-w-lg text-3xl font-black leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
+              Importa backups a otro Appwrite.
+            </h1>
+            <p className="mt-3 max-w-lg text-sm leading-6 text-slate-300 sm:text-base">
+              Selecciona un backup y los modulos a restaurar. Los IDs se remapean automaticamente.
+            </p>
+            <div className="mt-4 inline-block rounded-full bg-sky-300/20 px-4 py-2 text-sm font-bold text-sky-200">
               Restore order: auth → messaging → databases → storage → functions
             </div>
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            <DashboardMetric label="Modulos" value="5" tone="sky" />
+            <DashboardMetric label="Modulos" value="3" tone="sky" />
             <DashboardMetric label="Orden" value="Secuencial" tone="blue" />
             <DashboardMetric label="Remapeo" value="Auto" tone="emerald" />
           </div>
@@ -265,81 +286,6 @@ function ImportSection({
         <ImportResultAlert params={params} />
       ) : null}
     </>
-  );
-}
-
-function ActionPanel({ configError }: { configError: string | null }) {
-  const modules = ["all", "auth", "messaging", "databases", "storage", "functions"];
-
-  return (
-    <div className="rounded-[2rem] border border-white/10 bg-white/[0.07] p-6 shadow-2xl shadow-black/30 backdrop-blur-xl">
-      <p className="text-sm font-semibold tracking-[0.24em] text-emerald-200 uppercase">Acciones</p>
-      <h2 className="mt-3 text-2xl font-black text-white">Nuevo export</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-300">
-        Cada accion escribe en `BACKUP_OUTPUT_DIR` y genera manifest, checksums, logs y estado por modulo.
-      </p>
-
-      <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        {modules.map((moduleName) => (
-          <form key={moduleName} action={exportAction}>
-            <input name="module" type="hidden" value={moduleName} />
-            <LoadingSubmitButton
-              label={moduleName === "all" ? "Export all" : moduleName}
-              module={moduleName}
-              disabled={configError !== null}
-            />
-          </form>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ImportPanel({ backups, configError }: { backups: BackupSummary[]; configError: string | null }) {
-  const modules = ["all", "auth", "messaging", "databases", "storage", "functions"];
-
-  return (
-    <div className="rounded-[2rem] border border-white/10 bg-white/[0.07] p-6 shadow-2xl shadow-black/30 backdrop-blur-xl">
-      <p className="text-sm font-semibold tracking-[0.24em] text-sky-200 uppercase">Restore</p>
-      <h2 className="mt-3 text-2xl font-black text-white">Importar backup</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-300">
-        Selecciona el backup y los modulos a restaurar. El orden de restore es automatico.
-      </p>
-
-      <form action={importAction} className="mt-6 space-y-4">
-        <label className="block">
-          <span className="text-sm font-medium text-slate-200">Backup</span>
-          <select
-            name="backupId"
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-sky-300/60"
-            required
-          >
-            <option value="">Seleccionar backup...</option>
-            {backups.map((b) => (
-              <option key={b.backupId} value={b.backupId}>
-                {b.backupId} — {formatDate(b.exportedAt)}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block">
-          <span className="text-sm font-medium text-slate-200">Modulos</span>
-          <select
-            name="module"
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-sky-300/60"
-          >
-            {modules.map((m) => (
-              <option key={m} value={m}>
-                {m === "all" ? "Todos (restore order automatico)" : m}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <LoadingSubmitButton label="Importar backup" module="import" disabled={configError !== null} />
-      </form>
-    </div>
   );
 }
 
@@ -426,14 +372,14 @@ function LatestBackupCard({ backup }: { backup: BackupSummary | undefined }) {
               </span>
             </div>
             <div className="mt-2">
-              <ProgressBar percent={status === "complete" ? 100 : status === "partial" ? 65 : 0} size="sm" />
+              <SimpleProgressBar percent={status === "complete" ? 100 : status === "partial" ? 65 : 0} size="sm" />
             </div>
           </div>
         ))}
       </div>
 
       <div className="mt-5">
-        <ProgressBar percent={backup.progress} />
+        <SimpleProgressBar percent={backup.progress} />
       </div>
 
       {backup.latestLogs.length > 0 ? (
@@ -516,13 +462,13 @@ function BackupHistory({ backups }: { backups: BackupSummary[] }) {
               </div>
             </div>
             <div className="mt-3">
-              <ProgressBar percent={backup.progress} size="sm" />
+              <SimpleProgressBar percent={backup.progress} size="sm" />
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               <MiniChip label={`docs ${backup.counts.documents ?? 0}`} />
               <MiniChip label={`files ${backup.counts.files ?? 0}`} />
               <MiniChip label={`sha ${backup.checksums}`} />
-              <MiniChip label={`warnings ${backup.warnings}`} />
+              <BackupWarnings count={backup.warnings} messages={backup.warningMessages} backupId={backup.backupId} />
             </div>
           </div>
         ))}
@@ -546,9 +492,6 @@ function LoginPanel({
     <div>
       <p className="text-sm font-semibold tracking-[0.24em] text-emerald-200 uppercase">Acceso privado</p>
       <h2 className="mt-3 text-3xl font-black text-white">Iniciar sesion</h2>
-      <p className="mt-3 text-sm leading-6 text-slate-300">
-        Usa las credenciales configuradas en `APP_LOGIN_USER` y `APP_LOGIN_PASSWORD`.
-      </p>
 
       {!configReady ? <InlineNotice tone="warning" message="Configura APP_LOGIN_USER y APP_LOGIN_PASSWORD." /> : null}
       {hasError ? <InlineNotice tone="error" message="Usuario o password incorrectos." /> : null}
@@ -567,17 +510,7 @@ function LoginPanel({
           />
         </label>
 
-        <label className="block">
-          <span className="text-sm font-medium text-slate-200">Password</span>
-          <input
-            name="password"
-            type="password"
-            autoComplete="current-password"
-            className="mt-2 w-full rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-white outline-none transition focus:border-emerald-300/60"
-            placeholder="••••••••"
-            required
-          />
-        </label>
+        <PasswordInput />
 
         <LoginSubmitButton configReady={configReady} />
       </form>
@@ -585,11 +518,18 @@ function LoginPanel({
   );
 }
 
-function MiniChip({ label }: { label: string }) {
-  return <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-300">{label}</span>;
+function MiniChip({ label, onClick }: { label: string; onClick?: () => void }) {
+  return (
+    <span 
+      className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-300 cursor-pointer hover:bg-white/20"
+      onClick={onClick}
+    >
+      {label}
+    </span>
+  );
 }
 
-function ProgressBar({ percent, size = "md" }: { percent: number; size?: "sm" | "md" }) {
+function SimpleProgressBar({ percent, size = "md" }: { percent: number; size?: "sm" | "md" }) {
   const clamped = Math.max(0, Math.min(100, percent));
   const height = size === "sm" ? "h-1.5" : "h-3";
   const textSize = size === "sm" ? "text-[10px]" : "text-xs";
@@ -645,6 +585,15 @@ function ImportIcon() {
   return (
     <svg className="size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M8 14V5M4.5 8.5 8 5l3.5 3.5M3 3h10" />
+    </svg>
+  );
+}
+
+function ScheduleIcon() {
+  return (
+    <svg className="size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="8" cy="9" r="6" />
+      <path d="M8 6v3l2 1.5M5 2v2M11 2v2" />
     </svg>
   );
 }
@@ -707,15 +656,17 @@ function BackgroundGlow() {
 
 function BrandHeader({ compact = false }: { compact?: boolean }) {
   return (
-    <div className="flex items-center gap-3">
-      <div className="grid size-11 place-items-center rounded-2xl border border-emerald-300/30 bg-emerald-300/10 font-mono text-sm font-bold text-emerald-200">
-        AET
-      </div>
-      <div>
-        <p className="text-sm font-semibold tracking-[0.28em] text-emerald-200/80 uppercase">
+    <div className="flex items-center gap-3 sm:gap-4">
+      <img
+        src="/logo_aet2_512x512.webp"
+        alt="Appwrite Export Toolkit"
+        className="size-11 rounded-xl object-cover sm:size-12 lg:size-14"
+      />
+      <div className="min-w-0">
+        <p className="text-sm font-semibold tracking-[0.28em] text-emerald-200/80 uppercase sm:text-base lg:text-lg">
           Appwrite Export Toolkit
         </p>
-        <p className="text-xs text-slate-400">
+        <p className="truncate text-xs text-slate-400 sm:text-sm">
           {compact ? "Panel operativo" : "Backup logico, validacion y restore controlado"}
         </p>
       </div>
@@ -726,22 +677,18 @@ function BrandHeader({ compact = false }: { compact?: boolean }) {
 function HeroCopy() {
   return (
     <div className="max-w-2xl">
-      <div className="mb-6 inline-flex rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2 text-sm text-emerald-100">
-        Exports persistentes en /data/backups
-      </div>
+      <img
+        src="/logo_aet.webp"
+        alt="Appwrite Export Toolkit"
+        className="mb-8 w-48 rounded-2xl object-cover shadow-2xl shadow-black/40 sm:w-56 lg:w-64"
+      />
       <h1 className="text-4xl font-black tracking-tight text-white sm:text-6xl">
         Controla tus backups Appwrite sin depender del servidor fisico.
       </h1>
       <p className="mt-6 max-w-xl text-lg leading-8 text-slate-300">
-        Exporta Auth, Databases, Storage, Functions y Messaging en archivos estructurados,
+        Exporta Auth, Databases, Storage en archivos estructurados,
         verificables y listos para migracion entre instancias.
       </p>
-
-      <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
-        <DashboardMetric label="Modulos" value="5" tone="emerald" />
-        <DashboardMetric label="Formato" value="NDJSON" tone="blue" />
-        <DashboardMetric label="Integridad" value="SHA256" tone="amber" />
-      </div>
     </div>
   );
 }
@@ -898,28 +845,6 @@ async function getDashboardData(): Promise<{
   }
 }
 
-async function exportAction(formData: FormData) {
-  "use server";
-
-  await requireAuthenticated();
-
-  let backupId: string;
-  const moduleName = String(formData.get("module") ?? "all");
-
-  try {
-    const config = loadAppwriteConfig();
-    const services = createAppwriteServices(config);
-    const selection = parseExportSelection(moduleName);
-    const result = await exportBackup({ selection, config, services });
-    backupId = result.backupId;
-  } catch (error) {
-    const reason = error instanceof Error ? error.message.slice(0, 80).replaceAll(" ", "_") : "export_failed";
-    redirect(`/?actionError=${encodeURIComponent(reason)}`);
-  }
-
-  redirect(`/?exported=${encodeURIComponent(backupId)}&exportModule=${encodeURIComponent(moduleName)}`);
-}
-
 async function validateAction(formData: FormData) {
   "use server";
 
@@ -942,31 +867,6 @@ async function validateAction(formData: FormData) {
 
   redirect(
     `/?validated=${encodeURIComponent(backupId)}&validationErrors=${errors}&validationWarnings=${warnings}`,
-  );
-}
-
-async function importAction(formData: FormData) {
-  "use server";
-
-  await requireAuthenticated();
-
-  const backupId = String(formData.get("backupId") ?? "");
-  const moduleName = String(formData.get("module") ?? "all");
-  let status = "complete";
-
-  try {
-    const config = loadTargetConfig();
-    const services = createAppwriteServices(config);
-    const selection = parseImportSelection(moduleName);
-    const result = await importBackup({ selection, config, services, backupPath: backupId });
-    status = result.status;
-  } catch (error) {
-    const reason = error instanceof Error ? error.message.slice(0, 80).replaceAll(" ", "_") : "import_failed";
-    redirect(`/?actionError=${encodeURIComponent(reason)}&tab=import`);
-  }
-
-  redirect(
-    `/?imported=${encodeURIComponent(backupId)}&importModule=${encodeURIComponent(moduleName)}&importStatus=${status}&tab=import`,
   );
 }
 
@@ -1058,4 +958,23 @@ function safeEqual(input: string, expected: string): boolean {
   const expectedHash = createHash("sha256").update(expected).digest();
 
   return timingSafeEqual(inputHash, expectedHash);
+}
+
+function Footer() {
+  return (
+    <footer className="mt-auto border-t border-white/10 pt-6 pb-4">
+      <div className="flex flex-col items-center justify-center gap-2 text-center text-sm text-slate-500">
+        <p>
+          Software puramente educativo. Creado por{" "}
+          <span className="font-semibold text-slate-400">Mauricio Sanchez</span>
+        </p>
+        <p className="flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0 1 12 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 0 1 3 12c0-1.605.42-3.113 1.157-4.418" />
+          </svg>
+          Licencia GNU GPLv3 · Código abierto
+        </p>
+      </div>
+    </footer>
+  );
 }

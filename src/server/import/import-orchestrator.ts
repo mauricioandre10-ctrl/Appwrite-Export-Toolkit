@@ -6,9 +6,8 @@ import { IdRemapper } from "./id-remapper";
 import { importAuth } from "./modules/auth-importer";
 import { importDatabases } from "./modules/database-importer";
 import { importStorage } from "./modules/storage-importer";
-import { importFunctions } from "./modules/functions-importer";
-import { importMessaging } from "./modules/messaging-importer";
 import type { ImportModuleResult } from "./modules/auth-importer";
+import { updateJob, completeJob } from "./progress-store";
 
 const log = pino({ level: "info" });
 
@@ -25,7 +24,13 @@ export type ImportResult = {
   finishedAt: string;
 };
 
-const RESTORE_ORDER = ["auth", "messaging", "databases", "storage", "functions"];
+const RESTORE_ORDER = ["auth", "databases", "storage"];
+
+const MODULE_WEIGHTS: Record<string, number> = {
+  auth: 20,
+  databases: 60,
+  storage: 20,
+};
 
 export function parseImportSelection(input: string): ImportSelection {
   if (input === "all") {
@@ -40,17 +45,38 @@ export function parseImportSelection(input: string): ImportSelection {
   return { modules: modules.length > 0 ? modules : [...RESTORE_ORDER] };
 }
 
+function computePercent(modules: string[], completedIndex: number): number {
+  if (modules.length === 0) return 0;
+  let weightSum = 0;
+  let completedWeight = 0;
+  for (let i = 0; i < modules.length; i++) {
+    const w = MODULE_WEIGHTS[modules[i]!] ?? 10;
+    weightSum += w;
+    if (i < completedIndex) {
+      completedWeight += w;
+    }
+  }
+  return Math.round((completedWeight / weightSum) * 100);
+}
+
 export async function importBackup(input: {
   selection: ImportSelection;
   config: AppwriteConfig;
   services: AppwriteServices;
   backupPath: string;
+  jobId?: string;
+  onProgress?: (percent: number, phase: string, module: string) => void;
 }): Promise<ImportResult> {
-  const { selection, config, services, backupPath } = input;
+  const { selection, config, services, backupPath, jobId } = input;
   const backupRoot = resolveManagedBackupPath(config.BACKUP_OUTPUT_DIR, backupPath);
   const remapper = await IdRemapper.load(backupRoot);
 
   log.info({ backupPath, modules: selection.modules, targetEndpoint: config.APPWRITE_ENDPOINT }, "Starting import");
+
+  if (jobId !== undefined) {
+    await updateJob(jobId, { status: "running", phase: "loading metadata", module: "", percent: 0 });
+  }
+  input.onProgress?.(0, "loading metadata", "");
 
   const result: ImportResult = {
     backupId: backupPath,
@@ -61,8 +87,15 @@ export async function importBackup(input: {
     finishedAt: "",
   };
 
-  for (const moduleName of selection.modules) {
+  for (let i = 0; i < selection.modules.length; i++) {
+    const moduleName = selection.modules[i]!;
     let moduleResult: ImportModuleResult;
+
+    const percent = computePercent(selection.modules, i);
+    if (jobId !== undefined) {
+      await updateJob(jobId, { status: "running", phase: "importing", module: moduleName, percent });
+    }
+    input.onProgress?.(percent, "importing", moduleName);
 
     log.info({ moduleName }, "Importing module");
 
@@ -76,12 +109,6 @@ export async function importBackup(input: {
           break;
         case "storage":
           moduleResult = await importStorage(services, backupRoot, remapper);
-          break;
-        case "functions":
-          moduleResult = await importFunctions(services, backupRoot, remapper);
-          break;
-        case "messaging":
-          moduleResult = await importMessaging(services, backupRoot, remapper);
           break;
         default:
           moduleResult = {
@@ -120,6 +147,10 @@ export async function importBackup(input: {
     await remapper.save(backupRoot);
   } catch {
     // Best effort - remapper save failure doesn't affect import result
+  }
+
+  if (jobId !== undefined) {
+    await completeJob(jobId, result);
   }
 
   log.info({ status: result.status, totalCreated: result.modules.reduce((a, m) => a + m.created, 0) }, "Import finished");

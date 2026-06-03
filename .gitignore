@@ -22,6 +22,8 @@
 /backups
 /exports
 /data
+/.data
+/.jobs
 
 # env files
 .env*

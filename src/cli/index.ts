@@ -31,7 +31,7 @@ program
 
 program
   .command("export")
-  .argument("[module]", "Module to export: all, auth, messaging, databases, storage, functions", "all")
+  .argument("[module]", "Module to export: all, auth, databases, storage", "all")
   .description("Export the configured Appwrite project into BACKUP_OUTPUT_DIR")
   .action(async (moduleName: string | undefined) => {
     const config = loadAppwriteConfig();
@@ -57,7 +57,7 @@ program
 
 program
   .command("import")
-  .argument("[module]", "Module to import: all, auth, messaging, databases, storage, functions", "all")
+  .argument("[module]", "Module to import: all, auth, databases, storage", "all")
   .option("--backup <path>", "Backup directory name inside BACKUP_OUTPUT_DIR")
   .description("Import a backup into the configured Appwrite target project")
   .action(async (moduleName: string | undefined, options: { backup?: string }) => {

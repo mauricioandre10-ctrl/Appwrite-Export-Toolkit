@@ -19,13 +19,9 @@ describe("createBackupId", () => {
     const authId = createBackupId("p1", new Date("2026-06-01T13:00:00.000Z"), "auth");
     const dbId = createBackupId("p1", new Date("2026-06-01T13:00:00.000Z"), "databases");
     const stoId = createBackupId("p1", new Date("2026-06-01T13:00:00.000Z"), "storage");
-    const fnId = createBackupId("p1", new Date("2026-06-01T13:00:00.000Z"), "functions");
-    const msgId = createBackupId("p1", new Date("2026-06-01T13:00:00.000Z"), "messaging");
 
     expect(authId).toBe("2026-06-01T13-00-00Z_auth_p1");
     expect(dbId).toBe("2026-06-01T13-00-00Z_databases_p1");
     expect(stoId).toBe("2026-06-01T13-00-00Z_storage_p1");
-    expect(fnId).toBe("2026-06-01T13-00-00Z_functions_p1");
-    expect(msgId).toBe("2026-06-01T13-00-00Z_messaging_p1");
   });
 });

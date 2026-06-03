@@ -1,4 +1,4 @@
-export type BackupModule = "project" | "auth" | "databases" | "storage" | "functions" | "messaging";
+export type BackupModule = "project" | "auth" | "databases" | "storage";
 
 export type BackupCounts = {
   users?: number;

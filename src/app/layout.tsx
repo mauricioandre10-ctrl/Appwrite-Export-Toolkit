@@ -4,6 +4,9 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Appwrite Export Toolkit",
   description: "Structured export and validation toolkit for Appwrite projects.",
+  icons: {
+    icon: "/logo_aet2_512x512.webp",
+  },
 };
 
 export default function RootLayout({

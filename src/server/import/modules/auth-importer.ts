@@ -44,8 +44,17 @@ export async function importAuth(
 
         const existingMapping = remapper.getDestination("user", sourceId);
         if (existingMapping) {
-          result.skipped += 1;
-          continue;
+          // Verify the mapped user still exists in the target. The IdRemapper
+          // persists across imports — if the target project was wiped and the
+          // user was deleted, the old mapping is stale and we should re-create.
+          try {
+            await services.users.get(existingMapping);
+            result.skipped += 1;
+            continue;
+          } catch {
+            // User no longer exists; clear the stale mapping and create fresh.
+            remapper.removeMapping("user", sourceId);
+          }
         }
 
         const email = String(user.email ?? "");

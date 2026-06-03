@@ -1,6 +1,6 @@
 import path from "node:path";
 
-export type ExportModule = "all" | "auth" | "databases" | "storage" | "functions" | "messaging";
+export type ExportModule = "all" | "auth" | "databases" | "storage";
 
 export function createBackupId(projectId: string, date = new Date(), module: ExportModule = "all"): string {
   const timestamp = date.toISOString().replaceAll(":", "-").replace(/\.\d{3}Z$/, "Z");

@@ -11,6 +11,7 @@ export type BackupSummary = {
   modules: string[];
   counts: BackupCounts;
   warnings: number;
+  warningMessages: string[];
   checksums: number;
   moduleStatus: Record<string, string>;
   progress: number;
@@ -47,19 +48,20 @@ export async function listBackupSummaries(outputDir: string): Promise<BackupSumm
         return null;
       }
 
-      return {
-        backupId,
-        backupRoot,
-        exportedAt: manifest.exportedAt,
-        projectId: manifest.projectId,
-        modules: [...manifest.modules],
-        counts: manifest.counts,
-        warnings: manifest.warnings.length,
-        checksums: Object.keys(manifest.checksums).length,
-        moduleStatus: manifest.moduleStatus ?? {},
-        progress: calculateProgress(manifest.moduleStatus ?? {}),
-        latestLogs: await readBackupLogs(backupRoot, 8),
-      } satisfies BackupSummary;
+       return {
+         backupId,
+         backupRoot,
+         exportedAt: manifest.exportedAt,
+         projectId: manifest.projectId,
+         modules: [...manifest.modules],
+         counts: manifest.counts,
+         warnings: manifest.warnings.length,
+         warningMessages: [...manifest.warnings],
+         checksums: Object.keys(manifest.checksums).length,
+         moduleStatus: manifest.moduleStatus ?? {},
+         progress: calculateProgress(manifest.moduleStatus ?? {}),
+         latestLogs: await readBackupLogs(backupRoot, 8),
+       } satisfies BackupSummary;
     }),
   );
 

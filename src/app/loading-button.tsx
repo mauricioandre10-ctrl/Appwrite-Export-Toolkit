@@ -6,12 +6,15 @@ export function LoadingSubmitButton({
   label,
   module: moduleName,
   disabled,
+  actionType = "export",
 }: {
   label: string;
   module: string;
   disabled?: boolean;
+  actionType?: "export" | "import";
 }) {
   const { pending } = useFormStatus();
+  const actionLabel = actionType === "import" ? "Importando" : "Exportando";
 
   return (
     <button
@@ -22,7 +25,7 @@ export function LoadingSubmitButton({
       {pending ? (
         <span className="absolute inset-0 flex items-center justify-center gap-2">
           <Spinner />
-          <span className="text-emerald-200">Exportando {moduleName === "all" ? "todos" : moduleName}...</span>
+          <span className="text-emerald-200">{actionLabel} {moduleName === "all" ? "todos" : moduleName}...</span>
         </span>
       ) : null}
     </button>

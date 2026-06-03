@@ -2,7 +2,9 @@ import "dotenv/config";
 
 import { mkdirSync, accessSync } from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { z } from "zod";
+import pino from "pino";
 
 const envSchema = z.object({
   APPWRITE_ENDPOINT: z.string().url(),
@@ -17,27 +19,38 @@ const envSchema = z.object({
 
 export type AppwriteConfig = z.infer<typeof envSchema>;
 
+const configLogger = pino({
+  level: process.env.LOG_LEVEL ?? "info",
+  redact: {
+    paths: ["APPWRITE_API_KEY", "APPWRITE_TARGET_API_KEY"],
+    remove: true,
+  },
+});
+
 function resolveBackupDir(configuredDir: string): string {
-  const resolved = path.resolve(configuredDir);
+  const candidates = [
+    configuredDir,
+    "/data",
+    path.resolve(process.cwd(), ".data"),
+  ].map((dir) => path.resolve(dir));
 
-  try {
-    mkdirSync(resolved, { recursive: true });
-    accessSync(resolved);
-    return resolved;
-  } catch {
-    // Configured dir not writable (e.g. /data on localhost)
+  for (const candidate of candidates) {
+    try {
+      mkdirSync(candidate, { recursive: true });
+      accessSync(candidate);
+      configLogger.info({ backupDir: candidate }, "Backup directory resolved");
+      return candidate;
+    } catch {
+      // try next candidate
+    }
   }
 
-  const fallback = path.resolve("./backups");
-  try {
-    mkdirSync(fallback, { recursive: true });
-    accessSync(fallback);
-    return fallback;
-  } catch {
-    // Last resort
-  }
-
-  return resolved;
+  // Last resort: tmpdir. The dir may not be writable, but the
+  // BackupWriter will throw a clearer error from there.
+  const lastResort = path.join(os.tmpdir(), "appwrite-export-toolkit-backups");
+  mkdirSync(lastResort, { recursive: true });
+  configLogger.warn({ backupDir: lastResort }, "Backup directory fell back to tmpdir (last resort)");
+  return lastResort;
 }
 
 export function loadAppwriteConfig(): AppwriteConfig {

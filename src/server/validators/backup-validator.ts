@@ -61,7 +61,6 @@ export async function validateBackup(backupRootInput: string): Promise<BackupVal
     await validateAuth(context, manifest);
     await validateStorage(context, manifest);
     await validateDatabases(context, manifest);
-    await validateFunctions(context, manifest);
     validateModuleStatus(context, manifest);
     validateRestoreOrder(context, manifest);
   }
@@ -305,83 +304,6 @@ async function validateDatabases(context: BackupContext, manifest: BackupManifes
   compareCount(context, "documents", manifest.counts.documents, context.databaseDocumentCount, "databases/schema.json");
 }
 
-async function validateFunctions(context: BackupContext, manifest: BackupManifest): Promise<void> {
-  if (!manifest.modules.includes("functions")) {
-    return;
-  }
-
-  const functions = await readJsonSafe(context, "functions/functions.json");
-  const functionRows = Array.isArray(functions) ? functions : [];
-
-  for (const functionRow of functionRows) {
-    if (!isObject(functionRow) || !isObject(functionRow.function)) {
-      addIssue(context, "warning", "function.shape", "Function entry has unexpected shape.", "functions/functions.json");
-      continue;
-    }
-
-    const functionId = typeof functionRow.function.$id === "string" ? functionRow.function.$id : "unknown";
-    const events = Array.isArray(functionRow.function.events) ? functionRow.function.events : [];
-    validateFunctionEvents(context, events, functionId);
-
-    if (isObject(functionRow.exportStatus)) {
-      const discovered = typeof functionRow.exportStatus.deploymentsDiscovered === "number" ? functionRow.exportStatus.deploymentsDiscovered : 0;
-      const downloaded = typeof functionRow.exportStatus.deploymentsDownloaded === "number" ? functionRow.exportStatus.deploymentsDownloaded : 0;
-      if (discovered > downloaded) {
-        addIssue(
-          context,
-          "warning",
-          "function.deployment_partial",
-          `Function ${functionId} has ${discovered} discovered deployments but only ${downloaded} downloaded deployments.`,
-          `functions/function_${functionId}/export-status.json`,
-        );
-      }
-    }
-  }
-
-  compareCount(context, "functions", manifest.counts.functions, functionRows.length, "functions/functions.json");
-}
-
-function validateRestoreOrder(context: BackupContext, manifest: BackupManifest): void {
-  const requiredOrder = ["auth", "messaging", "databases", "storage", "functions"];
-  const actual = manifest.restoreOrder;
-
-  for (const moduleName of requiredOrder) {
-    if (!actual.includes(moduleName as never)) {
-      addIssue(context, "warning", "restore_order.missing_module", `Restore order is missing ${moduleName}.`, "manifest.json");
-    }
-  }
-
-  const authIndex = actual.indexOf("auth");
-  const databaseIndex = actual.indexOf("databases");
-  const storageIndex = actual.indexOf("storage");
-  const functionsIndex = actual.indexOf("functions");
-
-  if (authIndex > databaseIndex || authIndex > storageIndex) {
-    addIssue(context, "error", "restore_order.auth", "Auth must be restored before Databases and Storage.", "manifest.json");
-  }
-
-  if (functionsIndex < databaseIndex || functionsIndex < storageIndex) {
-    addIssue(context, "error", "restore_order.functions", "Functions must be restored after Databases and Storage.", "manifest.json");
-  }
-}
-
-function validateModuleStatus(context: BackupContext, manifest: BackupManifest): void {
-  if (manifest.moduleStatus === undefined) {
-    addIssue(context, "warning", "module_status.missing", "Manifest does not include moduleStatus.", "manifest.json");
-    return;
-  }
-
-  for (const [moduleName, status] of Object.entries(manifest.moduleStatus)) {
-    if (status === "failed") {
-      addIssue(context, "error", "module_status.failed", `Module ${moduleName} failed during export.`, "manifest.json");
-    }
-
-    if (status === "partial") {
-      addIssue(context, "warning", "module_status.partial", `Module ${moduleName} exported partially.`, "manifest.json");
-    }
-  }
-}
-
 function validateDocument(context: BackupContext, document: unknown, sourcePath: string): void {
   if (!isObject(document)) {
     addIssue(context, "warning", "database.document_shape", "Document entry has unexpected shape.", sourcePath);
@@ -409,32 +331,38 @@ function validatePermissions(context: BackupContext, permissions: unknown, label
   }
 }
 
-function validateFunctionEvents(context: BackupContext, events: readonly unknown[], functionId: string): void {
-  for (const event of events) {
-    if (typeof event !== "string") {
-      continue;
+function validateRestoreOrder(context: BackupContext, manifest: BackupManifest): void {
+  const requiredOrder = ["auth", "databases", "storage"];
+  const actual = manifest.restoreOrder;
+
+  for (const moduleName of requiredOrder) {
+    if (!actual.includes(moduleName as never)) {
+      addIssue(context, "warning", "restore_order.missing_module", `Restore order is missing ${moduleName}.`, "manifest.json");
+    }
+  }
+
+  const authIndex = actual.indexOf("auth");
+  const databaseIndex = actual.indexOf("databases");
+  const storageIndex = actual.indexOf("storage");
+
+  if (authIndex > databaseIndex || authIndex > storageIndex) {
+    addIssue(context, "error", "restore_order.auth", "Auth must be restored before Databases and Storage.", "manifest.json");
+  }
+}
+
+function validateModuleStatus(context: BackupContext, manifest: BackupManifest): void {
+  if (manifest.moduleStatus === undefined) {
+    addIssue(context, "warning", "module_status.missing", "Manifest does not include moduleStatus.", "manifest.json");
+    return;
+  }
+
+  for (const [moduleName, status] of Object.entries(manifest.moduleStatus)) {
+    if (status === "failed") {
+      addIssue(context, "error", "module_status.failed", `Module ${moduleName} failed during export.`, "manifest.json");
     }
 
-    const match = event.match(/^databases\.([^.]+)\.(?:tables|collections)\.([^.]+)\.(?:rows|documents)\./);
-    if (match === null) {
-      continue;
-    }
-
-    const databaseId = match[1];
-    const collectionId = match[2];
-
-    if (databaseId === undefined || collectionId === undefined) {
-      continue;
-    }
-
-    if (!context.databaseIds.has(databaseId)) {
-      addIssue(context, "warning", "reference.function_database", `Function ${functionId} event references missing database ${databaseId}.`, "functions/functions.json");
-      continue;
-    }
-
-    const collectionIds = context.collectionIdsByDatabase.get(databaseId);
-    if (collectionIds !== undefined && !collectionIds.has(collectionId)) {
-      addIssue(context, "warning", "reference.function_collection", `Function ${functionId} event references missing collection/table ${collectionId}.`, "functions/functions.json");
+    if (status === "partial") {
+      addIssue(context, "warning", "module_status.partial", `Module ${moduleName} exported partially.`, "manifest.json");
     }
   }
 }

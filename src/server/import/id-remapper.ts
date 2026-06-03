@@ -26,6 +26,10 @@ export class IdRemapper {
     return this.mappings.get(type)?.get(sourceId);
   }
 
+  removeMapping(type: IdMapping["type"], sourceId: string): void {
+    this.mappings.get(type)?.delete(sourceId);
+  }
+
   getSource(type: IdMapping["type"], destinationId: string): string | undefined {
     const typeMap = this.mappings.get(type);
     if (!typeMap) return undefined;

@@ -1,0 +1,72 @@
+import { mkdirSync, rmSync, statSync } from "node:fs";
+import path from "node:path";
+
+import { logger } from "../utils/logger";
+import { getSchedulesDir } from "./storage";
+
+const LOCK_STALE_MS = 30 * 60 * 1000;
+
+function lockFilePath(scheduleId: string): string {
+  const safe = scheduleId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return path.join(getSchedulesDir(), `${safe}.lock`);
+}
+
+export function acquireLock(scheduleId: string): boolean {
+  const filePath = lockFilePath(scheduleId);
+
+  try {
+    mkdirSync(filePath, { recursive: false });
+    return true;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EEXIST") {
+      if (isLockStale(filePath)) {
+        logger.warn({ scheduleId }, "Stale schedule lock detected, removing");
+        try {
+          rmSync(filePath, { recursive: true, force: true });
+        } catch {
+          return false;
+        }
+        try {
+          mkdirSync(filePath, { recursive: false });
+          return true;
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    }
+    return false;
+  }
+}
+
+export function releaseLock(scheduleId: string): void {
+  const filePath = lockFilePath(scheduleId);
+  try {
+    rmSync(filePath, { recursive: true, force: true });
+  } catch (err) {
+    logger.warn(
+      { scheduleId, err: err instanceof Error ? err.message : String(err) },
+      "Failed to release schedule lock",
+    );
+  }
+}
+
+function isLockStale(filePath: string): boolean {
+  try {
+    const stat = statSync(filePath);
+    return Date.now() - stat.mtimeMs > LOCK_STALE_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function isLocked(scheduleId: string): boolean {
+  const filePath = lockFilePath(scheduleId);
+  try {
+    statSync(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
