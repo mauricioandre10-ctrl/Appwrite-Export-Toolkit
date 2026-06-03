@@ -149,7 +149,7 @@ export async function restoreSchema(
     logger.error({ error: msg }, "Schema restore failed");
   }
 
-  logger.info({ created: result.created, skipped: result.skipped, errors: result.errors.length, status: result.status }, "Schema restore complete");
+  logger.info({ created: result.created, skipped: result.skipped, errorCount: result.errors.length, status: result.status }, "Schema restore complete");
   return result;
 }
 

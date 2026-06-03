@@ -230,14 +230,14 @@ export async function importDatabases(
             }
           }
 
-          logger.info({ collId, imported: importedCount, skipped: result.skipped, failed: failedCount, total: docLines.length }, "Collection import summary");
+          logger.info({ collId, imported: importedCount, skipped: result.skipped, failedCount, total: docLines.length }, "Collection import summary");
         } catch {
           logger.warn({ dbId, collId, docsPath }, "No documents file found");
         }
       }
     }
 
-    logger.info({ created: result.created, skipped: result.skipped, errors: result.errors.length, status: result.status }, "Database import complete");
+    logger.info({ created: result.created, skipped: result.skipped, errorCount: result.errors.length, status: result.status }, "Database import complete");
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Unknown error";
     result.errors.push(`Database import failed: ${msg}`);
