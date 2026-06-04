@@ -5,8 +5,23 @@ const CSRF_SECRET = process.env.APP_CSRF_SECRET ?? process.env.APP_LOGIN_PASSWOR
 const TOKEN_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
 /**
- * Stateless CSRF token: HMAC(sessionId + timestamp, secret)
- * No cookie needed. Token is generated server-side and validated on submission.
+ * Genera un token CSRF stateless firmado con HMAC-SHA256.
+ *
+ * El token no requiere almacenamiento en servidor ni cookies adicionales.
+ * Se genera completamente server-side y se valida en cada submission.
+ *
+ * Formato del token: `timestamp:signature`
+ * - `timestamp`: Unix timestamp en milisegundos (epoch) en base 10.
+ * - `signature`: HMAC-SHA256 del payload `sessionToken:timestamp`, en hexadecimal.
+ *
+ * @param sessionToken - Token de sesión del usuario actual (cookie de Appwrite).
+ * @returns Token CSRF en formato `"timestamp:signature"`.
+ *
+ * @example
+ * ```ts
+ * const token = generateCsrfToken("abc123");
+ * // "1717500000000:a1b2c3d4..."
+ * ```
  */
 export function generateCsrfToken(sessionToken: string): string {
   const timestamp = Date.now().toString();

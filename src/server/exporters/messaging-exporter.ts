@@ -4,7 +4,23 @@ import { listAll, paginateRows } from "../utils/pagination";
 import { omitSensitiveFields } from "./sanitize";
 import type { JsonObject, ModuleExportResult } from "./types";
 
-/** Exporta proveedores, topics, suscriptores y mensajes de Messaging, redactando credenciales. */
+/**
+ * Exporta proveedores, topics, suscriptores y mensajes de Messaging, redactando credenciales.
+ * Genera placeholders para credenciales de proveedores que requieren restauración manual.
+ *
+ * @param services - Cliente Appwrite con el SDK de messaging.
+ * @param writer - BackupWriter encargado de crear directorios y escribir los archivos de backup.
+ * @returns Resultado del export con contadores de providers, topics y mensajes, más warnings.
+ * @throws Si falla la escritura de archivos o la conexión con Appwrite.
+ *
+ * @remarks
+ * - Las credenciales de proveedores (API keys, tokens) no se exportan; se generan placeholders.
+ * - Los mensajes históricos se exportan solo para auditoría, no son necesarios para restaurar funcionalidad.
+ * - Los subscribers se asocian a su topic correspondiente en el archivo NDJSON.
+ * - Los providers se redactan con `omitSensitiveFields` antes de escribir.
+ * - Los mensajes se procesan en streaming para soportar volúmenes grandes.
+ * - El archivo `credentials.placeholders.json` lista los proveedores que requieren reconfiguración manual.
+ */
 export async function exportMessaging(services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("messaging");
 

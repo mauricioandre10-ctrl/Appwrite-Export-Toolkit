@@ -67,6 +67,30 @@ export function parseImportSelection(input: string): ImportSelection {
   return { modules: modules.length > 0 ? modules : [...RESTORE_ORDER] };
 }
 
+/**
+ * Calcula el porcentaje de progreso ponderado de la importación basándose en los
+ * módulos procesados y sus pesos relativos. Especular a `computeExportPercent`
+ * del export-orchestrator, pero operando sobre strings genéricos en vez de
+ * ExportableModule.
+ *
+ * Cada módulo tiene un peso que refleja su costo relativo de tiempo:
+ * - `databases`: peso 60 (la fase más lenta y costosa)
+ * - `auth`: peso 20 (relativamente rápido)
+ * - `storage`: peso 20 (relativamente rápido)
+ *
+ * El cálculo suma los pesos de todos los módulos para obtener el total, y luego
+ * suma los pesos de los módulos cuyo índice es menor a `completedIndex` (los que
+ * ya terminaron). El resultado es `(pesoCompletado / pesoTotal) * 100`, redondeado
+ * al entero más cercano.
+ *
+ * Si un módulo no está en el mapa de pesos, se usa un peso por defecto de 10.
+ * Si la lista de módulos está vacía, retorna 0.
+ *
+ * @param modules - Lista ordenada de módulos que se están importando.
+ * @param completedIndex - Índice del próximo módulo a procesar. Los módulos con
+ *                         índice menor a este se consideran completados.
+ * @returns Porcentaje de progreso (0-100), redondeado al entero más cercano.
+ */
 function computePercent(modules: string[], completedIndex: number): number {
   if (modules.length === 0) return 0;
   let weightSum = 0;

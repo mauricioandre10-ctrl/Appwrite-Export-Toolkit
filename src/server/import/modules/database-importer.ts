@@ -19,6 +19,20 @@ interface SchemaFile {
   databases: SchemaDatabase[];
 }
 
+/**
+ * Construye un índice (Map) de bases de datos a partir del archivo schema.json.
+ *
+ * Lee y parsea el archivo JSON de esquema, extrae cada base de datos y la indexa
+ * por su `$id` en un Map para acceso rápido. Si el archivo no existe, no es JSON
+ * válido o falla la lectura por cualquier motivo, devuelve un Map vacío sin lanzar
+ * excepciones.
+ *
+ * @param schemaPath - Ruta completa al archivo `schema.json` del backup.
+ * @param readFile - Función para leer archivos (normalmente `fs/promises.readFile`).
+ *   Se inyecta como dependencia para facilitar el testing.
+ * @returns Promise que se resuelve con un Map donde la clave es el `$id` de la base
+ *   de datos y el valor es el objeto `SchemaDatabase` completo.
+ */
 function buildSchemaIndex(schemaPath: string, readFile: (p: string, enc: BufferEncoding) => Promise<string>): Promise<Map<string, SchemaDatabase>> {
   return readFile(schemaPath, "utf8")
     .then((raw) => {

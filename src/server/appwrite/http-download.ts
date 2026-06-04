@@ -19,7 +19,23 @@ export type DownloadResult = {
   bytes: number;
 };
 
-/** Descarga un archivo de Storage de Appwrite y lo guarda en disco con verificación SHA-256. */
+/**
+ * Descarga un archivo de Storage de Appwrite y lo guarda en disco con verificación SHA-256.
+ *
+ * Construye la URL de descarga siguiendo el patrón:
+ * `{endpoint}/storage/buckets/{bucketId}/files/{fileId}/download`
+ *
+ * Los IDs se codifican con `encodeURIComponent` para manejar caracteres especiales.
+ *
+ * @param input - Objeto con la configuración y parámetros de la descarga.
+ * @param input.config - Configuración de Appwrite (endpoint, project ID, API key).
+ * @param input.bucketId - ID del bucket de Storage de donde descargar.
+ * @param input.fileId - ID del archivo a descargar dentro del bucket.
+ * @param input.outputPath - Ruta local donde se guardará el archivo descargado.
+ * @returns Objeto `DownloadResult` con la ruta del archivo, el hash SHA-256 y los bytes totales.
+ * @throws {Error} Si la respuesta HTTP no es exitosa (status != 2xx).
+ * @throws {Error} Si el body de la respuesta es null (respuesta sin contenido).
+ */
 export async function downloadStorageFile(input: {
   config: AppwriteConfig;
   bucketId: string;
@@ -30,7 +46,23 @@ export async function downloadStorageFile(input: {
   return downloadAppwriteResource({ config: input.config, url, outputPath: input.outputPath });
 }
 
-/** Descarga el código fuente o los outputs de un deployment de una función de Appwrite. */
+/**
+ * Descarga el código fuente o los outputs de un deployment de una función de Appwrite.
+ *
+ * Construye la URL de descarga siguiendo el patrón:
+ * `{endpoint}/functions/{functionId}/deployments/{deploymentId}/download?type={type}`
+ *
+ * @param input - Objeto con la configuración y parámetros de la descarga.
+ * @param input.config - Configuración de Appwrite (endpoint, project ID, API key).
+ * @param input.functionId - ID de la función de Appwrite.
+ * @param input.deploymentId - ID del deployment específico a descargar.
+ * @param input.outputPath - Ruta local donde se guardará el archivo descargado.
+ * @param input.type - Tipo de descarga: `"source"` para el código fuente,
+ *   `"output"` para los artefactos compilados/build result.
+ * @returns Objeto `DownloadResult` con la ruta del archivo, el hash SHA-256 y los bytes totales.
+ * @throws {Error} Si la respuesta HTTP no es exitosa (status != 2xx).
+ * @throws {Error} Si el body de la respuesta es null (respuesta sin contenido).
+ */
 export async function downloadFunctionDeployment(input: {
   config: AppwriteConfig;
   functionId: string;
@@ -42,6 +74,26 @@ export async function downloadFunctionDeployment(input: {
   return downloadAppwriteResource({ config: input.config, url, outputPath: input.outputPath });
 }
 
+/**
+ * Descarga un recurso desde Appwrite con streaming, hash SHA-256 y reintento.
+ *
+ * Crea el directorio padre del `outputPath` si no existe (`recursive: true`).
+ * Usa `pipeline` de Node.js para un streaming eficiente: el response body se
+ * lee como un `ReadableStream`, se transforma para calcular el hash en vivo,
+ * y se escribe directamente al disco sin acumular todo en memoria.
+ *
+ * Incluye reintento automático via `withRetry` (maneja errores transitorios
+ * como timeouts o errores 5xx).
+ *
+ * @param input - Objeto con la configuración de la descarga.
+ * @param input.config - Configuración de Appwrite (endpoint, project ID, API key).
+ * @param input.url - URL completa del recurso a descargar.
+ * @param input.outputPath - Ruta local donde se guardará el archivo.
+ * @returns Objeto `DownloadResult` con la ruta del archivo, el hash SHA-256
+ *   y la cantidad total de bytes descargados.
+ * @throws {Error} Si la respuesta HTTP no es exitosa (status != 2xx).
+ * @throws {Error} Si el body de la respuesta es null.
+ */
 async function downloadAppwriteResource(input: {
   config: AppwriteConfig;
   url: string;

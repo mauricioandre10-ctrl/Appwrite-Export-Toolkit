@@ -3,6 +3,7 @@ import type { AppwriteServices } from "../../appwrite/client";
 import type { IdRemapper } from "../id-remapper";
 import { createHash } from "node:crypto";
 
+/** Resultado del proceso de importación de un módulo, con conteo de elementos creados, omitidos y errores. */
 export type ImportModuleResult = {
   module: string;
   status: "complete" | "partial" | "failed";
@@ -11,6 +12,27 @@ export type ImportModuleResult = {
   errors: string[];
 };
 
+/**
+ * Importa usuarios de autenticación desde un archivo `auth/users.ndjson`.
+ *
+ * Lee cada línea del archivo NDJSON, crea los usuarios en el proyecto destino
+ * con contraseñas temporales deterministas, y restaura labels y prefs en
+ * operaciones best-effort.
+ *
+ * Si el usuario ya existe (error "duplicate"), intenta resolver el mapeo
+ * buscando por email en el proyecto destino. Si el mapeo previo del remapper
+ * apunta a un usuario que ya no existe, lo descarta y recrea el usuario.
+ *
+ * Se omiten usuarios sin email ni nombre.
+ *
+ * @param services - Cliente de Appwrite con los servicios necesarios (users).
+ * @param backupRoot - Ruta raíz del backup en disco.
+ * @param remapper - Instancia de IdRemapper para traducir IDs de origen a destino.
+ * @returns Resultado del módulo con conteo de creados, omitidos y errores.
+ *   Estado `"failed"` si la lectura del archivo falla completamente;
+ *   `"partial"` si algunos usuarios fallaron pero otros se procesaron.
+ *   `"complete"` si todo se procesó sin errores.
+ */
 export async function importAuth(
   services: AppwriteServices,
   backupRoot: string,
@@ -127,6 +149,19 @@ export async function importAuth(
   return result;
 }
 
+/**
+ * Genera una contraseña temporal determinista a partir de un seed.
+ *
+ * Usa SHA-256 sobre el seed y extrae los primeros 16 caracteres hexadecimales.
+ * La contraseña resultante cumple complejidad básica: empieza con "Temp",
+ * termina con "!1Aa" (mayúscula, minúscula, número).
+ *
+ * **Importante:** estas contraseñas son temporales y predecibles — solo deben
+ * usarse para que el usuario pueda hacer reset en el sistema destino.
+ *
+ * @param seed - String semilla (típicamente el ID de usuario de origen).
+ * @returns Contraseña temporal de 24 caracteres.
+ */
 function generateTempPassword(seed: string): string {
   return `Temp${createHash("sha256").update(seed).digest("hex").slice(0, 16)}!1Aa`;
 }

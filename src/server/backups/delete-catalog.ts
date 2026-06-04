@@ -4,6 +4,7 @@ import path from "node:path";
 import type { BackupManifest } from "../types/backup";
 import { resolveManagedBackupPath } from "./catalog";
 
+/** Información necesaria para eliminar un backup, incluyendo tamaño, cantidad de archivos y metadatos básicos. */
 export type BackupDeletionInfo = {
   backupId: string;
   backupRoot: string;

@@ -4,7 +4,21 @@ import { listAll, paginateRows } from "../utils/pagination";
 import { isObject, omitSensitiveFields } from "./sanitize";
 import type { JsonObject, ModuleExportResult } from "./types";
 
-/** Exporta usuarios, equipos, membresías y targets de Auth, redactando campos sensibles como contraseñas e hashes. */
+/**
+ * Exporta el módulo completo de Auth: usuarios, equipos, membresías y targets.
+ * Redacta campos sensibles como contraseñas, hashes y datos operativos de push notifications.
+ *
+ * @param services - Cliente Appwrite con los SDKs de cada servicio (teams, users).
+ * @param writer - BackupWriter encargado de crear directorios y escribir los archivos de backup.
+ * @returns Resultado del export con contadores, warnings y lista de archivos generados.
+ * @throws Si falla la escritura de archivos o la conexión con Appwrite.
+ *
+ * @remarks
+ * - Los hashes de contraseña y campos `password` se excluyen del export por seguridad.
+ * - Los push targets son datos de dispositivo y pueden no ser válidos tras restaurar.
+ * - Los usuarios se procesan en streaming (paginateRows) para soportar volúmenes grandes.
+ * - Si un team no tiene `$id` válido, se omite silenciosamente.
+ */
 export async function exportAuth(services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("auth");
 

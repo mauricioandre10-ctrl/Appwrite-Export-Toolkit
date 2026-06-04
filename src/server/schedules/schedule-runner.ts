@@ -45,6 +45,19 @@ function resolveConfig(target: Schedule["target"]): ReturnType<typeof loadAppwri
   return target === "target" ? loadTargetConfig() : loadAppwriteConfig();
 }
 
+/**
+ * Construye un registro de ejecución placeholder con estado "running".
+ *
+ * Crea un objeto `ScheduleRun` preliminar que representa una ejecución en progreso.
+ * Se usa antes de que la exportación inicie, para registrar en el historial que
+ * hay un trabajo activo. El `jobId` es opcional porque el caller puede haberlo
+ * pre-asignado o puede omitirse temporalmente.
+ *
+ * @param startedAt - Fecha/hora de inicio de la ejecución.
+ * @param trigger - Tipo de trigger que inició la ejecución ("scheduled" o "manual").
+ * @param jobId - ID del job opcional. Si se proporciona, se incluye en el registro.
+ * @returns Objeto `ScheduleRun` con estado "running" listo para ser escrito en historial.
+ */
 function buildPlaceholderRun(startedAt: Date, trigger: ScheduleRunTrigger, jobId?: string): ScheduleRun {
   const run: ScheduleRun = {
     ranAt: startedAt.toISOString(),
@@ -57,6 +70,22 @@ function buildPlaceholderRun(startedAt: Date, trigger: ScheduleRunTrigger, jobId
   return run;
 }
 
+/**
+ * Construye un registro de ejecución final con duración calculada.
+ *
+ * Crea un objeto `ScheduleRun` completo que representa una ejecución terminada
+ * (éxito o fallo). Calcula automáticamente la duración en milisegundos restando
+ * `finishedAt - startedAt`. Si se proporciona `errorMessage`, se incluye en el
+ * registro.
+ *
+ * @param startedAt - Fecha/hora de inicio de la ejecución.
+ * @param finishedAt - Fecha/hora de finalización de la ejecución.
+ * @param trigger - Tipo de trigger que inició la ejecución ("scheduled" o "manual").
+ * @param status - Estado final de la ejecución ("success" o "failed").
+ * @param jobId - ID del job asociado a esta ejecución.
+ * @param errorMessage - Mensaje de error opcional, incluido solo si el estado es "failed".
+ * @returns Objeto `ScheduleRun` con la información completa de la ejecución.
+ */
 function buildFinalRun(
   startedAt: Date,
   finishedAt: Date,

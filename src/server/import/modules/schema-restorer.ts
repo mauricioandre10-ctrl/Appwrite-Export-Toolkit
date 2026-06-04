@@ -163,6 +163,28 @@ export async function restoreSchema(
   return result;
 }
 
+/**
+ * Crea un atributo en una colección de Appwrite a partir de su representación exportada.
+ *
+ * Maneja los ~12 tipos de atributos soportados: boolean, datetime, email, enum,
+ * float/double, integer, string, url y los 4 tipos de relación (oneToOne, oneToMany,
+ * manyToOne, manyToMany). Para relaciones, traduce el `relatedCollectionId` original
+ * al ID destino usando el `IdRemapper` proporcionado.
+ *
+ * Los valores por defecto solo se establecen si el atributo no es requerido y
+ * el valor exportado no es null/undefined. Para enteros y floats, se validan
+ * los rangos con `Number.isSafeInteger` y `Number.isFinite` respectivamente.
+ *
+ * @param services - Cliente de Appwrite con acceso al servicio `databases`.
+ * @param databaseId - ID de la base de datos destino donde se creará el atributo.
+ * @param collectionId - ID de la colección destino.
+ * @param attr - Objeto del atributo exportado con su tipo, nombre, opciones y metadatos.
+ * @param remapper - Instancia opcional de IdRemapper para resolver IDs de colecciones
+ *   en relaciones. Si no se provee, se usan los IDs originales del export.
+ * @returns Promise que se resuelve cuando el atributo ha sido creado en el servidor.
+ * @throws Error si el tipo de atributo es desconocido (no está en el switch).
+ * @throws Error si el atributo es una relación pero falta `relatedCollectionId`.
+ */
 async function createAttributeFromExport(
   services: AppwriteServices,
   databaseId: string,
@@ -322,6 +344,28 @@ async function createAttributeFromExport(
 // Indices y otros atributos dependientes no se pueden crear hasta que
 // los atributos base estén disponibles, así que hacemos polling con
 // un intervalo de 2s y máximo de 30 intentos (~60s) antes de rendirnos.
+/**
+ * Espera a que todos los atributos indicados estén en estado "available" en Appwrite.
+ *
+ * Appwrite procesa la creación de atributos de forma asíncrona: la API responde
+ * inmediatamente con status "processing", pero el atributo no está realmente
+ * listo hasta que su status cambie a "available". Esta función realiza polling
+ * sobre cada clave de atributo con un intervalo configurable y un máximo de
+ * intentos antes de considerar timeout.
+ *
+ * Si un atributo no alcanza el estado "available" después del máximo de intentos,
+ * se registra un warning en el logger pero no se lanza excepción (el proceso
+ * continúa normalmente, y los atributos pendientes podrían fallar al crear índices
+ * dependientes).
+ *
+ * @param services - Cliente de Appwrite con acceso al servicio `databases`.
+ * @param databaseId - ID de la base de datos que contiene la colección.
+ * @param collectionId - ID de la colección cuyos atributos se verifican.
+ * @param attributeKeys - Arreglo de nombres de atributos a esperar.
+ * @param log - Logger opcional de pino para registrar advertencias de timeout.
+ * @returns Promise que se resuelve cuando todos los atributos están disponibles
+ *   o se alcanza el máximo de intentos.
+ */
 async function waitForAttributesAvailable(
   services: AppwriteServices,
   databaseId: string,
@@ -349,6 +393,22 @@ async function waitForAttributesAvailable(
   }
 }
 
+/**
+ * Crea un índice en una colección de Appwrite a partir de su representación exportada.
+ *
+ * Mapea los tipos de índice exportados ("unique", "fulltext" y cualquier otro → "key")
+ * a los enums correspondientes del SDK de Appwrite. Las órdenes de clasificación
+ * ("asc"/"desc") se traducen a `OrderBy.Asc` / `OrderBy.Desc`.
+ *
+ * Si el índice exportado contiene `lengths`, se pasan directamente al SDK.
+ *
+ * @param services - Cliente de Appwrite con acceso al servicio `databases`.
+ * @param databaseId - ID de la base de datos destino.
+ * @param collectionId - ID de la colección destino.
+ * @param idx - Objeto del índice exportado con tipo, atributos, órdenes y longitudes.
+ * @returns Promise que se resuelve cuando el índice ha sido creado en el servidor.
+ * @throws Error si la API de Appwrite rechaza la creación (atributo inexistente, etc.).
+ */
 async function createIndexFromExport(
   services: AppwriteServices,
   databaseId: string,

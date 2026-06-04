@@ -3,7 +3,22 @@ import type { BackupWriter } from "../backup/backup-writer";
 import { listAll, paginateRows } from "../utils/pagination";
 import type { ModuleExportResult } from "./types";
 
-/** Exporta bases de datos, colecciones, atributos, índices y documentos de Appwrite. */
+/**
+ * Exporta bases de datos, colecciones, atributos, índices y documentos de Appwrite.
+ * Genera un schema JSON con la estructura completa y archivos NDJSON por colección.
+ *
+ * @param services - Cliente Appwrite con el SDK de bases de datos.
+ * @param writer - BackupWriter encargado de crear directorios y escribir los archivos de backup.
+ * @returns Resultado del export con contadores de DBs, colecciones y documentos, más warnings.
+ * @throws Si falla la escritura de archivos o la conexión con Appwrite.
+ *
+ * @remarks
+ * - La API de Databases está deprecated en Appwrite 1.8.x (reemplazada por TablesDB), pero sigue funcionando.
+ * - Los campos de sistema como `$createdAt`, `$updatedAt` y `$sequence` pueden no ser restaurables.
+ * - Los documentos se exportan en streaming por colección para manejar colecciones grandes.
+ * - Cada colección genera un archivo NDJSON independiente bajo `databases/db_{id}/collection_{id}.ndjson`.
+ * - El schema completo (DBs, colecciones, atributos, índices) se guarda en `databases/schema.json`.
+ */
 export async function exportDatabases(services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("databases");
 

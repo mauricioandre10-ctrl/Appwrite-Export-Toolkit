@@ -360,4 +360,5 @@ function TimeField({
   );
 }
 
+/** Genera una descripción legible en español para un preset de programación cron. */
 export { describeInSpanish };

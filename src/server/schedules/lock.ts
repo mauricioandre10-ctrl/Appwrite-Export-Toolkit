@@ -13,7 +13,9 @@ function lockFilePath(scheduleId: string): string {
 
 /**
  * Intenta adquirir un lock exclusivo para un schedule.
- * Retorna true si se obtuvo el lock, false si ya está ocupado.
+ *
+ * @param scheduleId - Identificador del schedule a bloquear.
+ * @returns `true` si se obtuvo el lock, `false` si ya está ocupado o no se pudo adquirir.
  */
 export function acquireLock(scheduleId: string): boolean {
   const filePath = lockFilePath(scheduleId);
@@ -44,7 +46,18 @@ export function acquireLock(scheduleId: string): boolean {
   }
 }
 
-/** Libera el lock de un schedule, eliminando el archivo de lock del disco. */
+/**
+ * Libera el lock de un schedule, eliminando el archivo de lock del disco.
+ *
+ * Si el archivo de lock no existe o hay un error de I/O al eliminarlo, se loguea
+ * un warning pero la función no lanza excepciones (fail-safe).
+ *
+ * @param scheduleId - Identificador del schedule cuyo lock se desea liberar.
+ *
+ * @edge-cases
+ * - Si el lock ya fue liberado previamente, la operación es un no-op.
+ * - Si hay un error de permisos al borrar el archivo, se registra un warning y se ignora.
+ */
 export function releaseLock(scheduleId: string): void {
   const filePath = lockFilePath(scheduleId);
   try {
@@ -66,7 +79,19 @@ function isLockStale(filePath: string): boolean {
   }
 }
 
-/** Verifica si un schedule tiene un lock activo en disco. */
+/**
+ * Verifica si un schedule tiene un lock activo en disco.
+ *
+ * Comprueba la existencia del directorio-lock en el sistema de archivos.
+ * Si el directorio no existe o hay un error al acceder, retorna `false`.
+ *
+ * @param scheduleId - Identificador del schedule a consultar.
+ * @returns `true` si el lock existe en disco, `false` en caso contrario.
+ *
+ * @edge-cases
+ * - Retorna `false` si el scheduleId contiene caracteres que generan una ruta inválida.
+ * - No valida si el lock está stale; usar `acquireLock` para esa lógica.
+ */
 export function isLocked(scheduleId: string): boolean {
   const filePath = lockFilePath(scheduleId);
   try {

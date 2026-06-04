@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { BackupCounts, BackupManifest } from "../types/backup";
 
+/** Resumen completo de un backup exportado, incluyendo metadatos, estado de los módulos y logs recientes. */
 export type BackupSummary = {
   backupId: string;
   backupRoot: string;
@@ -18,6 +19,7 @@ export type BackupSummary = {
   latestLogs: BackupLogEntry[];
 };
 
+/** Entrada individual de log de un backup, con timestamp, nivel y mensaje descriptivo. */
 export type BackupLogEntry = {
   timestamp: string;
   level: "INFO" | "WARN" | "ERROR";
@@ -98,6 +100,21 @@ export async function readBackupLogs(backupRoot: string, limit = 50): Promise<Ba
   }
 }
 
+/**
+ * Calcula el porcentaje de progreso de un backup basándose en el estado de cada módulo.
+ *
+ * Usa un sistema de puntuación ponderada donde cada módulo contribuye según su estado:
+ * - `complete` → 1.0 (100%)
+ * - `partial` → 0.65 (65%)
+ * - Cualquier otro estado (o no presente) → 0.0 (0%)
+ *
+ * El resultado final es la suma de puntos dividida por el número total de módulos,
+ * redondeado al entero más cercano (0-100). Si no hay módulos, devuelve 0.
+ *
+ * @param moduleStatus - Objeto que mapea nombres de módulos a sus estados ("complete",
+ *   "partial", "failed", etc.).
+ * @returns Porcentaje de progreso como número entero entre 0 y 100.
+ */
 function calculateProgress(moduleStatus: Record<string, string>): number {
   const statuses = Object.values(moduleStatus);
 

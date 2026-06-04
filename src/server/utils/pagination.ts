@@ -11,6 +11,23 @@ export type AppwriteListResponse<TKey extends string, TItem> = {
 
 /**
  * Recorre todas las páginas de una lista de Appwrite y devuelve todos los registros juntos en un solo array.
+ *
+ * Utiliza {@link paginateRows} internamente para iterar las páginas. Acumula todos los
+ * registros en un único array, lo cual puede consumir mucha memoria si el conjunto de datos
+ * es muy grande. Usar {@link paginateRows} directamente si se necesita procesar en streaming.
+ *
+ * @typeParam TKey - Nombre de la clave que contiene los items en la respuesta de Appwrite
+ *   (por ejemplo, `"documents"`, `"files"`).
+ * @typeParam TItem - Tipo de cada item retornado por la API.
+ * @param key - Nombre de la propiedad en la respuesta que contiene el array de items.
+ * @param list - Función que ejecuta la consulta paginada contra Appwrite. Recibe un array
+ *   de queries (strings serializados de `Query.limit()` y `Query.offset()`).
+ * @param options - Opciones de paginación.
+ * @param options.limit - Cantidad de registros por página (default: 100).
+ * @param options.safetyLimit - Límite máximo acumulativo de registros antes de abortar (default: 100000).
+ * @returns Un objeto con `total` (total de registros según la API) y `rows` (array con todos
+ *   los registros acumulados de todas las páginas).
+ * @throws {Error} Si se supera el `safetyLimit` durante la paginación.
  */
 export async function listAll<TKey extends string, TItem>(
   key: TKey,
@@ -30,6 +47,29 @@ export async function listAll<TKey extends string, TItem>(
 
 /**
  * Generador asíncrono que pagina una lista de Appwrite, devolviendo lotes de registros uno por uno.
+ *
+ * Cada lote contiene un `total` (total de registros según la API) y un array `rows` con los
+ * registros de esa página. La paginación usa offset/limit y se detiene cuando la cantidad de
+ * registros en un lote es menor al `limit` (indicando la última página) o cuando se supera
+ * el `safetyLimit`.
+ *
+ * @typeParam TKey - Nombre de la clave que contiene los items en la respuesta de Appwrite.
+ * @typeParam TItem - Tipo de cada item retornado por la API.
+ * @param key - Nombre de la propiedad en la respuesta que contiene el array de items.
+ * @param list - Función que ejecuta la consulta paginada contra Appwrite. Recibe un array
+ *   de queries serializados.
+ * @param options - Opciones de paginación.
+ * @param options.limit - Cantidad de registros por página (default: 100).
+ * @param options.safetyLimit - Límite máximo acumulativo de registros antes de abortar (default: 100000).
+ * @yields Objetos `{ total, rows }` representando cada lote de registros.
+ * @throws {Error} Si se supera el `safetyLimit` después de procesar más registros que el límite.
+ *
+ * @example
+ * ```ts
+ * for await (const page of paginateRows("documents", listFn, { limit: 200 })) {
+ *   console.log(`Procesando ${page.rows.length} registros (total: ${page.total})`);
+ * }
+ * ```
  */
 export async function* paginateRows<TKey extends string, TItem>(
   key: TKey,

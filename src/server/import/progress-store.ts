@@ -5,6 +5,20 @@ import os from "node:os";
 
 const jobLocks = new Map<string, Promise<void>>();
 
+/**
+ * Serializa ejecuciones concurrentes para un mismo jobId usando un patrón
+ * de cadena de promesas. Cada llamada se encola al final de la anterior,
+ * garantizando que solo una operación modifica el job a la vez.
+ *
+ * El .then(fn, fn) ejecuta fn tanto si la promesa previa resolvió como si falló,
+ * así que nunca se pierde una operación por un error previo. El cleanup del
+ * finally solo borra la cadena del mapa si esta instancia es la última en
+ * encolarse (evita borrar la cadena de otra operación concurrente).
+ *
+ * @param jobId - Identificador del job sobre el que se aplica el lock.
+ * @param fn - Función asíncrona que se ejecuta serializada dentro del lock.
+ * @returns La resolución de fn.
+ */
 async function withJobLock<T>(jobId: string, fn: () => Promise<T>): Promise<T> {
   // Patrón de cadena de promesas para serializar operaciones por job.
   // Cada llamada engancha su ejecución al final de la anterior (prev.then(fn, fn)).
@@ -95,11 +109,15 @@ async function writeJob(job: JobProgress): Promise<void> {
 }
 
 /**
- * Genera un ID único para un job basándose en su tipo y la fecha actual.
- * El formato incluye tipo, timestamp ISO y un contador incremental.
+ * Genera un ID único para un job. El formato es "{type}_{sanitizedTimestamp}_{counter}",
+ * donde el timestamp ISO sanitiza ":" por "-" y elimina los milisegundos finales (por
+ * ejemplo: `export_2026-06-01T12-00-00Z_1`). El contador es incremental a nivel de
+ * módulo y se incrementa en cada llamada, por lo que nunca produce duplicados dentro
+ * de la misma ejecución del proceso. Se asegura de que el directorio de jobs exista
+ * antes de generar el ID.
  *
  * @param type - Tipo de operación: "import" o "export".
- * @returns Una cadena con el ID generado.
+ * @returns Una cadena con el ID en el formato descrito.
  */
 export async function createJobId(type: "import" | "export"): Promise<string> {
   await getJobsDir();
@@ -109,9 +127,15 @@ export async function createJobId(type: "import" | "export"): Promise<string> {
 }
 
 /**
- * Crea un nuevo job con estado inicial "pending" y lo persiste en disco.
+ * Crea un nuevo job con estado inicial "pending" y lo persiste como archivo JSON
+ * en el directorio de jobs. Inicializa todos los campos con valores por defecto:
+ * percent=0, phase="initializing", module y detail vacíos, startedAt con la fecha
+ * actual y finishedAt vacío.
  *
- * @param jobId - Identificador único del job.
+ * Si ya existe un archivo con el mismo jobId, se sobreescribe sin advertencia.
+ * Esto permite reutilizar un jobId si se llama dos veces con el mismo identificador.
+ *
+ * @param jobId - Identificador único del job (generado previamente con createJobId).
  * @param type - Tipo de operación: "import" o "export".
  * @returns El objeto JobProgress creado con los valores por defecto.
  */
@@ -132,12 +156,17 @@ export async function createJob(jobId: string, type: "import" | "export"): Promi
 }
 
 /**
- * Aplica parciales actualizaciones a un job existente. Utiliza un lock
- * por job para evitar escrituras concurrentes que pierdan datos.
+ * Aplica parciales actualizaciones a un job existente. Utiliza un lock por job
+ * (withJobLock) para serializar escrituras concurrentes y evitar que se pierdan
+ * datos. Si el job no existe en disco (archivo ausente o JSON inválido), la
+ * operación retorna silenciosamente sin lanzar error.
+ *
+ * Los campos jobId y type no se pueden modificar; el objeto `updates` los excluye
+ * por diseño (Partial<Omit<JobProgress, "jobId" | "type">>).
  *
  * @param jobId - Identificador del job a actualizar.
  * @param updates - Campos a modificar (parcial, sin jobId ni type).
- * @returns void
+ * @returns void — no retorna valor. Si el job no existe, no hace nada.
  */
 export async function updateJob(jobId: string, updates: Partial<Omit<JobProgress, "jobId" | "type">>): Promise<void> {
   await withJobLock(jobId, async () => {
@@ -149,13 +178,23 @@ export async function updateJob(jobId: string, updates: Partial<Omit<JobProgress
 }
 
 /**
- * Marca un job como completado o fallido, registra el resultado o error
- * y actualiza la marca de tiempo de finalización.
+ * Marca un job como terminado, estableciendo su estado final y registrando
+ * timestamps y resultado/error. Utiliza withJobLock para garantizar atomicidad.
+ *
+ * El comportamiento depende del parámetro `error`:
+ * - Si se provee `error`: el status se pone en "failed" y se mantiene el percent
+ *   actual sin modificar.
+ * - Si no se provee `error`: el status se pone en "completed" y el percent se
+ *   fuerza a 100, independientemente del valor previo.
+ *
+ * En ambos casos se actualiza `finishedAt` con la fecha/hora actual y se almacena
+ * el resultado o error proporcionado. Si el job no existe, la operación retorna
+ * silenciosamente.
  *
  * @param jobId - Identificador del job a finalizar.
- * @param result - Resultado opcional de la operación (solo en caso de éxito).
- * @param error - Mensaje de error opcional (si se provee, el job se marca como fallido).
- * @returns void
+ * @param result - Resultado opcional de la operación (solo se guarda si no hay error).
+ * @param error - Mensaje de error opcional. Si se provee, el job se marca como fallido.
+ * @returns void — no retorna valor.
  */
 export async function completeJob(jobId: string, result?: unknown, error?: string): Promise<void> {
   await withJobLock(jobId, async () => {
@@ -189,9 +228,17 @@ export async function getJob(jobId: string): Promise<JobProgress | undefined> {
 
 /**
  * Elimina archivos de jobs cuya fecha de finalización (o inicio) sea anterior
- * al límite de edad especificado. Útil para limpiar jobs obsoletos.
+ * al límite de edad especificado. Útil para limpiar jobs obsoletos del directorio.
  *
- * @param maxAgeMs - Edad máxima en milisegundos. Por defecto 1 hora (3600000).
+ * Para cada archivo JSON en el directorio de jobs, se parsea el contenido y se
+ * determina la fecha de referencia: se usa `finishedAt` si el job tiene fecha de
+ * finalización (trabajos completados o fallidos), o `startedAt` si el job nunca
+ * terminó (trabajos pendientes o en ejecución). Si la diferencia entre "ahora" y
+ * esa fecha supera `maxAgeMs`, el archivo se elimina.
+ *
+ * Los archivos que no se pueden parsear como JSON válido se ignoran silenciosamente.
+ *
+ * @param maxAgeMs - Edad máxima en milisegundos. Por defecto 1 hora (3 600 000 ms).
  * @returns La cantidad de archivos eliminados.
  */
 export async function cleanupOldJobs(maxAgeMs = 3600000): Promise<number> {

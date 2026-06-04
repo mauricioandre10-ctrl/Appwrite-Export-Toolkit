@@ -6,7 +6,24 @@ import { listAll } from "../utils/pagination";
 import { omitSensitiveFields } from "./sanitize";
 import type { JsonObject, ModuleExportResult } from "./types";
 
-/** Exporta funciones, variables (redactadas) y descarga los deployments de código fuente. */
+/**
+ * Exporta funciones, variables de entorno (redactadas) y descarga los deployments de código fuente.
+ * Genera metadata por función incluyendo variables placeholders y estado de descarga de deployments.
+ *
+ * @param config - Configuración de Appwrite necesaria para las descargas HTTP de deployments.
+ * @param services - Cliente Appwrite con el SDK de functions.
+ * @param writer - BackupWriter encargado de crear directorios y escribir los archivos de backup.
+ * @returns Resultado del export con status "complete" o "partial" según deployments descargados.
+ * @throws Si falla la escritura de archivos de metadata (no aborta por fallos de descarga).
+ *
+ * @remarks
+ * - Los valores de variables de entorno no son recuperables de Appwrite; se exportan como placeholders.
+ * - Los deployments se descargan como `.tar.gz` con el código fuente compilado.
+ * - Si un deployment no se puede descargar, se registra el error y se continúa con el resto.
+ * - Se descubren deployments tanto desde `listDeployments` como desde los campos `deploymentId` y `latestDeploymentId`.
+ * - El status es "partial" si se descubrieron más deployments de los que se pudieron descargar.
+ * - Cada función genera archivos `meta.json`, `variables.json`, `variables.placeholders.json` y `export-status.json`.
+ */
 export async function exportFunctions(config: AppwriteConfig, services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("functions");
 

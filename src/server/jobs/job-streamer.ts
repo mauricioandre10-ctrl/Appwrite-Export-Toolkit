@@ -103,6 +103,30 @@ async function executeJob(jobId: string, job: JobProgress, emit: Emitter): Promi
   }
 }
 
+/**
+ * Observa un job en ejecución leyendo periódicamente su archivo JSON y emitiendo
+ * eventos de progreso al cliente SSE. Se utiliza cuando el job ya está siendo
+ * procesado por otro proceso (por ejemplo, el programador de schedules) o por
+ * otro subscriber concurrente.
+ *
+ * La función implementa un bucle de polling con intervalo de POLL_INTERVAL_MS (500ms).
+ * Mantiene un objeto `lastEmitted` para deduplicar: solo emite un evento "progress"
+ * cuando percent, phase, module o status cambian respecto al último emitido, lo que
+ * reduce el consumo de ancho de banda en SSE.
+ *
+ * El bucle termina cuando el status del job deja de ser "running" o "pending":
+ * - Si es "completed": emite un evento "complete" con la URL de redirección.
+ * - Si es "failed": emite un evento "error-event" con el mensaje de error.
+ * - Cualquier otro estado inesperado también se reporta como error.
+ *
+ * Lanza un error si el archivo del job desaparece durante la ejecución o si el
+ * polling excede el timeout de PROGRESS_POLL_TIMEOUT_MS (30 minutos).
+ *
+ * @param jobId - Identificador del job a observar.
+ * @param startJob - Estado inicial del job al momento de iniciar la observación.
+ * @param emit - Función emisora para enviar eventos SSE al cliente.
+ * @returns Promesa que se resuelve cuando el job alcanza un estado terminal.
+ */
 async function observeJob(
   jobId: string,
   startJob: JobProgress,
@@ -143,6 +167,22 @@ async function observeJob(
   }
 }
 
+/**
+ * Compara el estado actual del job con el último emitido y, solo si hay cambios,
+ * envía un evento "progress" al cliente SSE y actualiza `lastEmitted`.
+ *
+ * La deduplicación es importante en conexiones SSE porque cada evento consume
+ * ancho de banda y el cliente puede estar en una red lenta. Si el job no cambia
+ * entre polls (por ejemplo, un módulo que tarda varios minutos), se evita enviar
+ * el mismo percent/phase/module una y otra vez.
+ *
+ * @param jobId - Identificador del job.
+ * @param job - Estado actual del job leído del archivo.
+ * @param emit - Función emisora para enviar eventos SSE.
+ * @param lastEmitted - Objeto mutable que rastrea los valores del último evento emitido.
+ *                      Se actualiza in-place cuando hay un cambio.
+ * @returns void — no retorna valor. Si no hay cambios, no emite nada.
+ */
 function emitProgressFromJob(
   jobId: string,
   job: JobProgress,
@@ -164,6 +204,24 @@ function emitProgressFromJob(
   emit("progress", { jobId, percent: job.percent, phase: job.phase, module: job.module, detail: job.detail });
 }
 
+/**
+ * Emite un evento "complete" con la URL de redirección apropiada según el tipo
+ * de job. La construcción del redirectUrl difiere entre import y export:
+ *
+ * - **Import**: redirige a `/?imported={backupId}&importStatus={status}&tab=import`,
+ *   incluyendo el estado de la importación (complete/partial/failed) y la pestaña
+ *   de importación.
+ * - **Export**: redirige a `/?exported={backupId}` de forma más simple.
+ *
+ * Si el resultado no contiene backupId, se usa una cadena vacía como fallback.
+ * Para imports, el status del resultado se extrae de `result.status` con un
+ * valor por defecto de "complete" si no está presente.
+ *
+ * @param jobId - Identificador del job completado.
+ * @param job - Objeto JobProgress con el resultado de la operación en `job.result`.
+ * @param emit - Función emisora para enviar eventos SSE.
+ * @returns void — no retorna valor.
+ */
 function emitCompleteFromResult(jobId: string, job: JobProgress, emit: Emitter): void {
   const result = job.result as { backupId?: string; status?: string } | undefined;
   const backupId = result?.backupId;
@@ -191,6 +249,27 @@ function emitErrorFromJob(jobId: string, job: JobProgress, emit: Emitter): void 
   emit("error-event", { jobId, error });
 }
 
+/**
+ * Ejecuta el ciclo completo de exportación dentro del contexto de streaming SSE.
+ * Carga la configuración de Appwrite, crea los servicios necesarios, parsea la
+ * selección de módulos y ejecuta exportBackup con un callback de progreso que
+ * emite eventos "progress" al cliente en cada actualización.
+ *
+ * Al finalizar, registra el resultado en el progress-store con completeJob y
+ * emite un evento "complete" con la URL de redirección que incluye el backupId
+ * y el módulo exportado.
+ *
+ * El progreso se emite en dos fases: primero un evento inicial de "preparando"
+ * al 0%, y luego los eventos del exportBackup que van desde el % calculado por
+ * módulo hasta el 95% (checksums). El 100% se registra internamente en
+ * completeJob pero no se emite como evento SSE.
+ *
+ * @param jobId - Identificador del job de exportación.
+ * @param moduleParam - Nombre del módulo a exportar o "all" para todos.
+ * @param emit - Función emisora para enviar eventos SSE al cliente.
+ * @returns Promesa que se resuelve cuando la exportación completa termina.
+ * @throws Si exportBackup lanza un error no capturado (errores de red, disk, etc.).
+ */
 async function runExportInStream(jobId: string, moduleParam: string, emit: Emitter): Promise<void> {
   emit("progress", { jobId, percent: 0, phase: "preparando", module: "", detail: "Cargando configuracion" });
 
@@ -217,6 +296,26 @@ async function runExportInStream(jobId: string, moduleParam: string, emit: Emitt
   });
 }
 
+/**
+ * Ejecuta el ciclo completo de importación dentro del contexto de streaming SSE.
+ * Carga la configuración target de Appwrite, crea los servicios, parsea la
+ * selección de módulos y ejecuta importBackup con un callback de progreso que
+ * emite eventos "progress" al cliente.
+ *
+ * **Lanza un Error** si el parámetro `backupId` es undefined o vacío, ya que
+ * no se puede ejecutar una importación sin saber qué backup restaurar.
+ *
+ * Al finalizar, registra el resultado en el progress-store con completeJob y
+ * emite un evento "complete" con la URL de redirección que incluye el backupId,
+ * el módulo importado, el estado de la importación y la pestaña de importación.
+ *
+ * @param jobId - Identificador del job de importación.
+ * @param moduleParam - Nombre del módulo a importar o "all" para todos.
+ * @param backupId - Identificador del backup a restaurar. Debe estar definido.
+ * @param emit - Función emisora para enviar eventos SSE al cliente.
+ * @returns Promesa que se resuelve cuando la importación completa termina.
+ * @throws Error si backupId es undefined o cadena vacía.
+ */
 async function runImportInStream(
   jobId: string,
   moduleParam: string,

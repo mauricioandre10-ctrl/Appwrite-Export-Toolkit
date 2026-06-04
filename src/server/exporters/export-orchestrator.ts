@@ -58,9 +58,29 @@ const EXPORT_WEIGHTS: Record<string, number> = {
   storage: 20,
 };
 
-// Pesos relativos de cada módulo para el cálculo de progreso.
-// databases (60%) pesa más porque es la parte más lenta y costosa;
-// auth y storage (20% cuno) son comparativamente rápidos.
+/**
+ * Calcula el porcentaje de progreso ponderado de la exportación basándose en los
+ * módulos procesados y sus pesos relativos.
+ *
+ * Cada módulo tiene un peso que refleja su costo relativo de tiempo:
+ * - `databases`: peso 60 (la fase más lenta y costosa)
+ * - `auth`: peso 20 (relativamente rápido)
+ * - `storage`: peso 20 (relativamente rápido)
+ *
+ * El cálculo suma los pesos de todos los módulos para obtener el total, y luego
+ * suma los pesos de los módulos cuyo índice es menor a `completedIndex` (los que
+ * ya terminaron). El resultado es `(pesoCompletado / pesoTotal) * 100`, redondeado
+ * al entero más cercano.
+ *
+ * Si un módulo no está en el mapa de pesos (por ejemplo, un módulo añadido en el
+ * futuro), se usa un peso por defecto de 10. Si la lista de módulos está vacía,
+ * retorna 0.
+ *
+ * @param modules - Lista ordenada de módulos que se están exportando.
+ * @param completedIndex - Índice del próximo módulo a procesar. Los módulos con
+ *                         índice menor a este se consideran completados.
+ * @returns Porcentaje de progreso (0-100), redondeado al entero más cercano.
+ */
 function computeExportPercent(modules: ExportableModule[], completedIndex: number): number {
   if (modules.length === 0) return 0;
   let weightSum = 0;

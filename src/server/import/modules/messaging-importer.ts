@@ -2,6 +2,30 @@ import type { AppwriteServices } from "../../appwrite/client";
 import type { IdRemapper } from "../id-remapper";
 import type { ImportModuleResult } from "./auth-importer";
 
+/**
+ * Importa proveedores de mensajería y tópicos desde un backup.
+ *
+ * **Proveedores** (`messaging/providers.json`):
+ * Lee el JSON, y por cada proveedor verifica si ya existe en el destino.
+ * Solo se recrean proveedores de tipo FCM/firebase; otros tipos se saltan.
+ * El `serviceAccountJSON` se parsea de string a objeto antes de pasarlo a la API.
+ *
+ * **Tópicos** (`messaging/topics.ndjson`):
+ * Lee cada línea del NDJSON, y por cada topic verifica si ya existe en el
+ * destino antes de crearlo.
+ *
+ * **Comportamiento clave:**
+ * - Archivos no encontrados (providers.json, topics.ndjson) se ignoran silenciosamente.
+ * - Líneas NDJSON inválidas se saltan sin error.
+ * - Los IDs se traducen mediante el `IdRemapper`.
+ *
+ * @param services - Cliente de Appwrite con servicios de messaging.
+ * @param backupRoot - Ruta raíz del backup en disco.
+ * @param remapper - Instancia de IdRemapper para traducir IDs entre proyectos.
+ * @returns Resultado del módulo con conteo de creados, omitidos y errores.
+ *   Estado `"failed"` si falla la lectura del directorio raíz;
+ *   `"partial"` si algunos proveedores o tópicos fallaron.
+ */
 export async function importMessaging(
   services: AppwriteServices,
   backupRoot: string,

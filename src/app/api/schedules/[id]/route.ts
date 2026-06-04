@@ -23,7 +23,13 @@ function validateCron(expression: string, timezone: string): string | null {
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Actualiza los campos de un schedule existente (cron, timezone, nombre, módulo, etc.). */
+/**
+ * Actualiza los campos de un schedule existente (cron, timezone, nombre, módulo, etc.).
+ *
+ * @param request - Request HTTP con el body JSON que contiene los campos a actualizar.
+ * @param context - Contexto de la ruta con el parámetro `id` del schedule.
+ * @returns JSON con el schedule actualizado, o un error si la validación falla.
+ */
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;
@@ -85,7 +91,13 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
   return NextResponse.json({ schedule: updated });
 }
 
-/** Elimina un schedule y lo desregistra del motor de cron. */
+/**
+ * Elimina un schedule y lo desregistra del motor de cron.
+ *
+ * @param request - Request HTTP (no se usa body).
+ * @param context - Contexto de la ruta con el parámetro `id` del schedule.
+ * @returns JSON con `{ success: true }` o un error si no se encuentra o falla la eliminación.
+ */
 export async function DELETE(request: Request, context: RouteContext): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;
@@ -114,7 +126,13 @@ export async function DELETE(request: Request, context: RouteContext): Promise<N
   return NextResponse.json({ success: true });
 }
 
-/** POST no-op; redirige al cliente a usar POST /api/schedules/[id]/run. */
+/**
+ * POST no-op en este endpoint. Redirige al cliente a usar POST /api/schedules/[id]/run.
+ *
+ * @param _request - Request HTTP (no se usa).
+ * @param context - Contexto de la ruta con el parámetro `id` del schedule.
+ * @returns JSON con error 405 indicando el endpoint correcto.
+ */
 export async function POST(_request: Request, context: RouteContext): Promise<NextResponse> {
   // POST on a single schedule is a no-op; exists to avoid 404 when client retries.
   const { id } = await context.params;

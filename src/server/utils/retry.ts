@@ -11,6 +11,35 @@ export type RetryOptions = {
 
 /**
  * Ejecuta una operación asíncrona con reintentos y backoff exponencial si ocurre un error transitorio.
+ *
+ * La fórmula de backoff es: `min(maxDelayMs, baseDelayMs * 2^(attempt - 1))`.
+ * Por defecto: intento 1 = 300ms, intento 2 = 600ms, intento 3 = 1200ms (capped a 3000ms).
+ *
+ * @typeParam T - Tipo del valor retornado por la operación.
+ * @param operation - Función asíncrona que se ejecuta en cada intento. Se invoca una vez
+ *   adicional si todos los reintentos fallan (ya que el último intento también lanza).
+ * @param options - Configuración del mecanismo de reintentos.
+ * @param options.attempts - Número máximo de intentos (default: 3). Debe ser >= 1.
+ * @param options.baseDelayMs - Delay base en milisegundos para el backoff (default: 300).
+ * @param options.maxDelayMs - Delay máximo en milisegundos para el backoff (default: 3000).
+ * @param options.shouldRetry - Predicate que decide si se reintenta dado un error.
+ *   Si retorna `true`, se reintenta. Por defecto reintenta errores con códigos 408, 409,
+ *   425, 429 o >= 500, y cualquier error sin código numérico.
+ * @param options.onRetry - Callback que se ejecuta antes de cada espera, recibe el número
+ *   de intento actual, el delay calculado y el error. Puede ser async.
+ * @returns El resultado de la operación si tiene éxito en cualquier intento.
+ * @throws {unknown} El último error capturado si se agotaron todos los reintentos, o el
+ *   error original si `shouldRetry` retorna `false` para ese error.
+ *
+ * @example
+ * ```ts
+ * const data = await withRetry(() => fetch("/api/data"), {
+ *   attempts: 5,
+ *   baseDelayMs: 500,
+ *   shouldRetry: (err) => isNetworkError(err),
+ *   onRetry: ({ attempt, delayMs }) => console.log(`Reintento ${attempt}, espera ${delayMs}ms`),
+ * });
+ * ```
  */
 export async function withRetry<T>(operation: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
   const attempts = options.attempts ?? 3;

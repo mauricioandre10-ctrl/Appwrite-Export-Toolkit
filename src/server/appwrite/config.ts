@@ -28,6 +28,25 @@ const configLogger = pino({
   },
 });
 
+/**
+ * Resuelve el directorio de backups probando una cadena de candidatos con fallback.
+ *
+ * Intenta crear y verificar acceso en este orden:
+ * 1. `configuredDir` (directorio configurado por el usuario).
+ * 2. `/data` (volumen típico en Docker/Kubernetes).
+ * 3. `.data` relativo al `process.cwd()`.
+ * 4. Como último recurso: `os.tmpdir()` + `/appwrite-export-toolkit-backups`.
+ *
+ * Cada candidato se intenta con `mkdirSync({ recursive: true })` + `accessSync`.
+ * Si ambos exitosan, se retorna ese directorio. Si alguno falla, se pasa al siguiente.
+ *
+ * Nota: el directorio tmpdir puede no ser persistente ni tener permisos de escritura
+ * ideales, pero se usa como último recurso para que el error sea más claro que
+ * un crash silencioso.
+ *
+ * @param configuredDir - Directorio configurado vía `BACKUP_OUTPUT_DIR`.
+ * @returns Ruta absoluta del directorio de backups resuelto.
+ */
 function resolveBackupDir(configuredDir: string): string {
   const candidates = [
     configuredDir,
@@ -54,7 +73,22 @@ function resolveBackupDir(configuredDir: string): string {
   return lastResort;
 }
 
-/** Carga y valida las variables de entorno del proyecto origen. */
+/**
+ * Carga y valida las variables de entorno del proyecto origen (Appwrite de export).
+ *
+ * Usa Zod para validar todas las variables requeridas contra `process.env`.
+ * Las API keys se redactan automáticamente en logs por el logger configurado.
+ *
+ * Resolución del directorio de backups (`BACKUP_OUTPUT_DIR`):
+ * 1. El valor configurado en la variable de entorno (default: `/data/backups`).
+ * 2. Si falla, intenta `/data`.
+ * 3. Si falla, intenta `.data` relativo al directorio de trabajo.
+ * 4. Como último recurso, usa `os.tmpdir()` + `/appwrite-export-toolkit-backups`.
+ *
+ * @returns Configuración validada con el directorio de backups resuelto.
+ * @throws {Error} Si las variables de entorno requeridas son inválidas o están ausentes.
+ *   El mensaje incluye los campos específicos que fallaron la validación.
+ */
 export function loadAppwriteConfig(): AppwriteConfig {
   const result = envSchema.safeParse(process.env);
 
@@ -69,7 +103,26 @@ export function loadAppwriteConfig(): AppwriteConfig {
   return { ...config, BACKUP_OUTPUT_DIR: backupDir };
 }
 
-/** Carga y valida la configuración del proyecto destino para operaciones de importación. */
+/**
+ * Carga y valida la configuración del proyecto destino para operaciones de importación.
+ *
+ * Requiere que las variables `APPWRITE_TARGET_ENDPOINT`, `APPWRITE_TARGET_PROJECT_ID`
+ * y `APPWRITE_TARGET_API_KEY` estén definidas. Si alguna falta, lanza un error.
+ *
+ * Realiza un self-import check: no permite importar al mismo proyecto origen
+ * por seguridad (aunque esta función solo remapea campos, no valida la coincidencia
+ * de IDs — esa validación se hace en el orquestador de import).
+ *
+ * Remapea los campos target sobre los campos origen para devolver un `AppwriteConfig`
+ * unificado:
+ * - `APPWRITE_TARGET_ENDPOINT` → `APPWRITE_ENDPOINT`
+ * - `APPWRITE_TARGET_PROJECT_ID` → `APPWRITE_PROJECT_ID`
+ * - `APPWRITE_TARGET_API_KEY` → `APPWRITE_API_KEY`
+ *
+ * @returns Configuración del destino lista para usar como `AppwriteConfig`.
+ * @throws {Error} Si las variables de entorno requeridas son inválidas (validación Zod).
+ * @throws {Error} Si falta alguna de las variables target obligatorias.
+ */
 export function loadTargetConfig(): AppwriteConfig {
   const result = envSchema.safeParse(process.env);
 

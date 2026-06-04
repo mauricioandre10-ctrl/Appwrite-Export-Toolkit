@@ -15,7 +15,13 @@ export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-/** Ejecuta manualmente un schedule de exportación y devuelve el jobId asignado. */
+/**
+ * Ejecuta manualmente un schedule de exportación y devuelve el jobId asignado.
+ *
+ * @param request - Request HTTP (no se usa body).
+ * @param context - Contexto de la ruta con el parámetro `id` del schedule.
+ * @returns JSON con el `jobId` asignado y estado 202, o un error si el schedule no existe o ya está corriendo.
+ */
 export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;

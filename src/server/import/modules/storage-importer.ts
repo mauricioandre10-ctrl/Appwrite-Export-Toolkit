@@ -3,6 +3,19 @@ import type { IdRemapper } from "../id-remapper";
 import type { ImportModuleResult } from "./auth-importer";
 import type { Compression } from "node-appwrite";
 
+/**
+ * Remapea los IDs de usuario dentro de strings de permisos Appwrite.
+ *
+ * Busca patrones `user:<id>` en cada string de permiso y reemplaza el ID de
+ * origen con el ID de destino según el remapper. Si no existe mapeo para un
+ * usuario, conserva el ID original sin modificar.
+ *
+ * Los permisos de tipo `team:` o `role:` no se modifican.
+ *
+ * @param permissions - Array de strings de permisos Appwrite (ej. `["user:abc123", "role:member"]`).
+ * @param remapper - Instancia de IdRemapper con los mapeos de usuarios.
+ * @returns Nuevo array con los permisos actualizados.
+ */
 function sanitizePermissions(permissions: string[], remapper: IdRemapper): string[] {
   return permissions.map((p) => {
     const userMatch = p.match(/user:([^")]+)/);
@@ -15,6 +28,27 @@ function sanitizePermissions(permissions: string[], remapper: IdRemapper): strin
   });
 }
 
+/**
+ * Importa buckets y archivos de storage desde un backup.
+ *
+ * Lee `storage/buckets.json` para crear cada bucket en el proyecto destino.
+ * Para cada bucket, busca el directorio `bucket_<id>/files.ndjson` y sube
+ * cada archivo referenciado.
+ *
+ * **Comportamiento clave:**
+ * - Saltas buckets/archivos que ya existen (skip-on-duplicate).
+ * - Protege contra path traversal: rechaza blobs cuya ruta resuelta
+ *   escape del directorio `backupRoot`.
+ * - Remapea permisos de usuario en archivos usando el `IdRemapper`.
+ * - Los archivos sin `blobPath` se omiten silenciosamente.
+ *
+ * @param services - Cliente de Appwrite con servicios de storage y users.
+ * @param backupRoot - Ruta raíz del backup en disco.
+ * @param remapper - Instancia de IdRemapper para traducir IDs entre proyectos.
+ * @returns Resultado del módulo con conteo de creados, omitidos y errores.
+ *   Estado `"failed"` si la lectura del JSON principal falla;
+ *   `"partial"` si hubo errores parciales en buckets o archivos.
+ */
 export async function importStorage(
   services: AppwriteServices,
   backupRoot: string,

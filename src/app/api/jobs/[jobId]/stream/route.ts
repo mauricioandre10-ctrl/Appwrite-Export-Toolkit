@@ -7,7 +7,25 @@ import { streamJob } from "@/server/jobs/job-streamer";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-/** Devuelve un stream SSE con los eventos de progreso de un job de importación. */
+/**
+ * Devuelve un stream Server-Sent Events (SSE) con los eventos de progreso de un job.
+ *
+ * Mantiene una conexión abierta que emite eventos de tipo `event` con datos
+ * JSON que reflejan el progreso en tiempo real (avance, módulos procesados,
+ * errores, etc.). El stream se cierra automáticamente cuando el job finaliza.
+ *
+ * @param _request - Request HTTP (no se usa el body).
+ * @param params - Parámetros de ruta con `jobId` (identificador del job).
+ * @returns Stream SSE (`text/event-stream`) con eventos de progreso en tiempo real.
+ *   Cada evento tiene la forma: `event: <tipo>\ndata: <JSON>\n\n`.
+ *
+ * @requires_auth - Requiere un token de sesión válido en la cookie de sesión.
+ *   No requiere CSRF ya que es solo lectura (GET).
+ *
+ * @error 401 - No se proporcionó un token de sesión válido (response JSON, no SSE).
+ * @error 404 - No se encontró un job con el `jobId` dado (response JSON, no SSE).
+ * @error 500 - Error inesperado durante el streaming (emite evento `error-event` antes de cerrar).
+ */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ jobId: string }> },

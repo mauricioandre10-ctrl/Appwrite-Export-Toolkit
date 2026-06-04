@@ -3,6 +3,28 @@ import type { IdRemapper } from "../id-remapper";
 import type { ImportModuleResult } from "./auth-importer";
 import type { Runtime } from "node-appwrite";
 
+/**
+ * Importa funciones desde un backup en el proyecto destino.
+ *
+ * Lee el directorio `functions/` y para cada subdirectorio `function_<id>`
+ * carga su `meta.json` para recrear la función con su nombre, runtime,
+ * permisos de ejecución, eventos, schedule y timeout.
+ *
+ * Después de crear la función, intenta restaurar las variables de entorno
+ * desde `variables.json`. Si una variable ya existe, se ignora silenciosamente.
+ *
+ * **Comportamiento clave:**
+ * - Si la función ya existe en el destino, se omite (skip-on-duplicate).
+ * - Si no existe el directorio `functions/` o un `meta.json`, se omite silenciosamente.
+ * - Los IDs se traducen mediante el `IdRemapper`.
+ *
+ * @param services - Cliente de Appwrite con servicios de functions.
+ * @param backupRoot - Ruta raíz del backup en disco.
+ * @param remapper - Instancia de IdRemapper para traducir IDs entre proyectos.
+ * @returns Resultado del módulo con conteo de creadas, omitidas y errores.
+ *   Estado `"failed"` si falla la lectura del directorio raíz;
+ *   `"partial"` si algunas funciones fallaron.
+ */
 export async function importFunctions(
   services: AppwriteServices,
   backupRoot: string,

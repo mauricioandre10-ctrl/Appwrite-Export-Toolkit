@@ -31,7 +31,23 @@ function extForMime(mimeType: string | undefined): string {
   return MIME_TO_EXT[mimeType] ?? `.${mimeType.split("/").pop() ?? "bin"}`;
 }
 
-/** Exporta buckets, archivos y blobs de Storage, descargando cada archivo y registrando su checksum. */
+/**
+ * Exporta buckets, archivos y blobs de Storage, descargando cada archivo y registrando su checksum.
+ * Maneja la conversión de MIME types a extensiones y registra errores de descarga sin abortar.
+ *
+ * @param config - Configuración de Appwrite necesaria para las descargas HTTP de blobs.
+ * @param services - Cliente Appwrite con el SDK de storage.
+ * @param writer - BackupWriter encargado de crear directorios y escribir archivos y blobs.
+ * @returns Resultado del export con status "complete" o "partial" según descargas fallidas.
+ * @throws Si falla la escritura de archivos de metadata (no aborta por fallos de descarga).
+ *
+ * @remarks
+ * - Cada archivo se descarga como blob y se almacena con extensión basada en su MIME type.
+ * - Si una descarga falla, el archivo se registra con `downloadError` y se continúa con el resto.
+ * - Los IDs de archivo deben preservarse durante el restore para mantener referencias de BD.
+ * - Los permisos de archivo pueden referenciar usuarios Auth y deben restaurarse después de Auth.
+ * - El campo `status` del resultado es "partial" si hubo al menos una descarga fallida.
+ */
 export async function exportStorage(config: AppwriteConfig, services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("storage");
 

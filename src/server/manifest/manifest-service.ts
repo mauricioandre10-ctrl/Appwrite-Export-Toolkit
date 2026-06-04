@@ -1,7 +1,22 @@
 import type { BackupManifest } from "../types/backup";
 
 /**
- * Crea un manifiesto vacío con los metadatos básicos del backup (proyecto, endpoint, versión de formato).
+ * Crea un manifiesto inicial vacío con los metadatos básicos del backup.
+ *
+ * Inicializa los campos con valores por defecto:
+ * - `modules`: array vacío (se llena durante el export de cada módulo).
+ * - `counts`: objeto vacío (se puebla con el conteo de recursos por tipo).
+ * - `restoreOrder`: `["auth", "databases", "storage"]` — orden recomendado para restaurar.
+ * - `warnings`: array vacío (se acumulan advertencias durante el export).
+ * - `checksums`: objeto vacío (se puebla con hashes SHA-256 de archivos exportados).
+ * - `exportedAt`: timestamp ISO 8601 de la fecha/hora actual del servidor.
+ *
+ * @param input - Datos del backup a exportar.
+ * @param input.formatVersion - Versión del formato de export (ej: `"1.0.0"`).
+ * @param input.endpoint - Endpoint del servidor Appwrite de origen.
+ * @param input.projectId - ID del proyecto de Appwrite exportado.
+ * @param input.appwriteVersion - Versión de Appwrite detectada en el servidor origen (opcional).
+ * @returns Objeto `BackupManifest` con los metadatos inicializados y listo para poblar.
  */
 export function createInitialManifest(input: {
   formatVersion: string;
