@@ -198,12 +198,25 @@ Plataformas compatibles: EasyPanel, Dokploy, cualquier plataforma que soporte Do
 
 > **⚠️ Seguridad:** Estas credenciales por defecto son solo para desarrollo. **En producción es obligatorio cambiarlas** antes de desplegar. Si se dejan por defecto, cualquier persona puede acceder al panel.
 
-### Opcionales (Runtime)
+### Build
+
+| Variable | Valor por defecto | Descripción |
+|----------|-------------------|-------------|
+| `NIXPACKS_NODE_VERSION` | `22` | Versión de Node.js para el build (usado por Dokploy/Nixpacks) |
+
+### Seguridad
+
+| Variable | Valor por defecto | Descripción |
+|----------|-------------------|-------------|
+| `APP_CSRF_SECRET` | - | **Requerido.** Secreto para tokens CSRF. Generar con: `openssl rand -hex 32` |
+
+### Runtime
 
 | Variable | Valor por defecto | Descripción |
 |----------|-------------------|-------------|
 | `LOG_LEVEL` | `info` | Nivel de log de pino |
 | `SCHEDULER_DISABLED` | - | Establecer en `1` para deshabilitar el programador de cron |
+| `COOKIE_SECURE` | `0` | Establecer en `1` si el sitio usa HTTPS (cookie `Secure` flag) |
 
 ## Estructura del proyecto
 
