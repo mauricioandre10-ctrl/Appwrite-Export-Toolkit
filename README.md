@@ -89,23 +89,12 @@ A diferencia de un backup físico (volúmenes Docker), esta herramienta exporta 
 La herramienta también incluye una interfaz de línea de comandos:
 
 ```bash
-# Inspeccionar el proyecto configurado
-npm run cli -- inspect
-
-# Exportar todos los módulos
-npm run cli -- export all
-
-# Exportar un módulo específico
-npm run cli -- export databases
-
-# Validar un backup existente
-npm run cli -- validate ./backups/backup-xxx
-
-# Importar un backup
-npm run cli -- import all --backup ./backups/backup-xxx
-
-# Eliminar un backup
-npm run cli -- delete backup-xxx --confirm
+npm run cli -- inspect                           # Inspeccionar el proyecto
+npm run cli -- export all                        # Exportar todos los módulos
+npm run cli -- export databases                  # Exportar un módulo específico
+npm run cli -- validate ./backups/backup-xxx     # Validar un backup
+npm run cli -- import all --backup ./backups/backup-xxx  # Importar un backup
+npm run cli -- delete backup-xxx --confirm       # Eliminar un backup
 ```
 
 ## Tecnologías utilizadas
@@ -206,6 +195,8 @@ Plataformas compatibles: EasyPanel, Dokploy, cualquier plataforma que soporte Do
 |----------|-------------------|-------------|
 | `APP_LOGIN_USER` | `admin` | Usuario del panel web |
 | `APP_LOGIN_PASSWORD` | `change-me-now` | Contraseña del panel web |
+
+> **⚠️ Seguridad:** Estas credenciales por defecto son solo para desarrollo. **En producción es obligatorio cambiarlas** antes de desplegar. Si se dejan por defecto, cualquier persona puede acceder al panel.
 
 ### Opcionales (Runtime)
 
