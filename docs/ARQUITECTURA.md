@@ -9,36 +9,36 @@ La idea principal es simple: conectás a tu Appwrite de origen, exportás todo a
 ## Componentes principales
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   INTERFAZ                          │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────┐ │
-│  │   Web UI     │  │     CLI      │  │  API REST │ │
-│  │  (React)     │  │ (commander)  │  │ (routes)  │ │
-│  └──────┬───────┘  └──────┬───────┘  └─────┬─────┘ │
-│         │                 │                │        │
-│  ┌──────┴─────────────────┴────────────────┴─────┐  │
-│  │            ORQUESTADORES                       │  │
-│  │  export-orchestrator.ts                        │  │
-│  │  import-orchestrator.ts                        │  │
-│  └────────────────────┬───────────────────────────┘  │
-│                       │                              │
-│  ┌────────────────────┴───────────────────────────┐  │
-│  │         EXPORTADORES / IMPORTADORES            │  │
-│  │  auth-exporter    │  auth-importer             │  │
-│  │  database-exporter│  database-importer         │  │
-│  │  storage-exporter │  storage-importer          │  │
-│  │                   │  functions-importer        │  │
-│  │                   │  messaging-importer        │  │
-│  │                   │  schema-restorer           │  │
-│  └────────────────────┬───────────────────────────┘  │
-│                       │                              │
-│  ┌────────────────────┴───────────────────────────┐  │
-│  │              SERVICIOS                         │  │
-│  │  appwrite client  │  backup-writer             │  │
-│  │  checksum-service │  progress-store            │  │
-│  │  scheduler-engine │  catalog                   │  │
-│  └────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────┘
++-----------------------------------------------------+
+|                   INTERFAZ                           |
+|  +--------------+  +--------------+  +-----------+  |
+|  |   Web UI     |  |     CLI      |  |  API REST |  |
+|  |  (React)     |  | (commander)  |  | (routes)  |  |
+|  +------+-------+  +------+-------+  +-----+-----+  |
+|         |                 |                |         |
+|  +------+-----------------+----------------+------+  |
+|  |            ORQUESTADORES                        |  |
+|  |  export-orchestrator.ts                         |  |
+|  |  import-orchestrator.ts                         |  |
+|  +---------------------+--------------------------+  |
+|                        |                             |
+|  +---------------------+--------------------------+  |
+|  |         EXPORTADORES / IMPORTADORES            |  |
+|  |  auth-exporter    |  auth-importer             |  |
+|  |  database-exporter|  database-importer         |  |
+|  |  storage-exporter |  storage-importer          |  |
+|  |                   |  functions-importer        |  |
+|  |                   |  messaging-importer        |  |
+|  |                   |  schema-restorer           |  |
+|  +---------------------+--------------------------+  |
+|                        |                             |
+|  +---------------------+--------------------------+  |
+|  |              SERVICIOS                          |  |
+|  |  appwrite client  |  backup-writer             |  |
+|  |  checksum-service |  progress-store            |  |
+|  |  scheduler-engine |  catalog                   |  |
+|  +-------------------------------------------------+  |
++-----------------------------------------------------+
 ```
 
 ## Flujo de Export
@@ -76,9 +76,9 @@ Cuando importás a un proyecto que ya tiene datos, los IDs del backup pueden col
 El sistema de schedules usa `croner` para parsing de expresiones cron. La arquitectura es:
 
 ```
-scheduler-engine (en memoria)  →  storage (archivos JSON en disco)
-         │                              │
-         └──── register / unregister ───┘
+scheduler-engine (en memoria)  ->  storage (archivos JSON en disco)
+         |                              |
+         +---- register / unregister ---+
 ```
 
 - `scheduler-engine`: Maneja el registro de cron jobs y ejecuta callbacks cuando toca

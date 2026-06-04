@@ -6,36 +6,36 @@ Esta documentación describe la estructura de archivos que genera el toolkit cua
 
 ```
 backup-YYYY-MM-DDTHH-MM-SSZ/
-├── manifest.json
-├── checksums.sha256
-├── export.log
-├── auth/
-│   ├── users.ndjson
-│   ├── teams.ndjson
-│   └── memberships.ndjson
-├── databases/
-│   ├── databases.json
-│   ├── collections/
-│   │   ├── db_default.json
-│   │   └── db_xxxxx.json
-│   └── documents/
-│       ├── col_xxxxx.ndjson
-│       └── col_yyyyy.ndjson
-├── storage/
-│   ├── buckets.json
-│   ├── files.json
-│   └── blobs/
-│       └── bucket_xxx/
-│           └── file_id
-├── functions/
-│   └── function_xxx/
-│       ├── meta.json
-│       ├── code/
-│       │   └── (archivos del bundle)
-│       └── variables.json
-└── messaging/
-    ├── providers.json
-    └── topics.ndjson
++-- manifest.json
++-- checksums.sha256
++-- export.log
++-- auth/
+|   +-- users.ndjson
+|   +-- teams.ndjson
+|   +-- memberships.ndjson
++-- databases/
+|   +-- databases.json
+|   +-- collections/
+|   |   +-- db_default.json
+|   |   +-- db_xxxxx.json
+|   +-- documents/
+|       +-- col_xxxxx.ndjson
+|       +-- col_yyyyy.ndjson
++-- storage/
+|   +-- buckets.json
+|   +-- files.json
+|   +-- blobs/
+|       +-- bucket_xxx/
+|           +-- file_id
++-- functions/
+|   +-- function_xxx/
+|       +-- meta.json
+|       +-- code/
+|       |   +-- (archivos del bundle)
+|       +-- variables.json
++-- messaging/
+    +-- providers.json
+    +-- topics.ndjson
 ```
 
 ## manifest.json

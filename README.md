@@ -9,30 +9,30 @@ Herramienta de exportación estructuración, validación y restauración de back
 ## Arquitectura
 
 ```
-┌─────────────────────────────────────────────────┐
-│              Panel Web (Next.js)                │
-│   Dashboard ─ Exportar ─ Programar ─ Importar   │
-└──────────┬──────────────┬──────────────┬────────┘
-           │              │              │
-┌──────────▼──────┐ ┌─────▼─────┐ ┌─────▼──────┐
-│  API Routes     │ │  CLI      │ │ Scheduler  │
-│  /api/export    │ │  inspect  │ │  (cron)    │
-│  /api/import    │ │  export   │ │            │
-│  /api/backups   │ │  validate │ │            │
-│  /api/schedules │ │  import   │ │            │
-│  /api/health    │ │  delete   │ │            │
-└──────────┬──────┘ └─────┬─────┘ └─────┬──────┘
-           │              │              │
-┌──────────▼──────────────▼──────────────▼────────┐
-│              Servidor (src/server/)             │
-│  Exporters ─ Importers ─ Validators ─ Backup    │
-└──────────────────────┬──────────────────────────┘
-                       │
-              ┌────────▼────────┐
-              │   Appwrite API  │
-              │  Auth / DB /    │
-              │  Storage        │
-              └─────────────────┘
++-------------------------------------------------+
+|              Panel Web (Next.js)                |
+|   Dashboard - Exportar - Programar - Importar   |
++----------+--------------+--------------+--------+
+           |              |              |
++----------v------+ +-----v-----+ +-----v------+
+|  API Routes     | |  CLI      | | Scheduler  |
+|  /api/export    | |  inspect  | |  (cron)    |
+|  /api/import    | |  export   | |            |
+|  /api/backups   | |  validate | |            |
+|  /api/schedules | |  import   | |            |
+|  /api/health    | |  delete   | |            |
++----------+------+ +-----+-----+ +-----+------+
+           |              |              |
++----------v--------------v--------------v--------+
+|              Servidor (src/server/)             |
+|  Exporters - Importers - Validators - Backup    |
++----------------------+-------------------------+
+                       |
+              +--------v--------+
+              |   Appwrite API  |
+              |  Auth / DB /    |
+              |  Storage        |
+              +-----------------+
 ```
 
 ## ¿Qué hace esta aplicación?
@@ -200,28 +200,28 @@ Plataformas compatibles: EasyPanel, Docploy, cualquier plataforma que soporte Do
 
 ```
 appwrite-export-toolkit/
-├── src/
-│   ├── app/                    # Páginas Next.js App Router
-│   │   ├── page.tsx            # Página principal (login + dashboard)
-│   │   ├── layout.tsx          # Layout raíz con metadata
-│   │   └── api/                # Rutas API
-│   │       ├── export/         # POST /api/export
-│   │       ├── import/         # POST /api/import
-│   │       ├── schedules/      # CRUD de schedules
-│   │       ├── backups/        # Gestión de backups
-│   │       └── health/         # Health check
-│   ├── components/             # Componentes React client
-│   ├── cli/                    # Interfaz de línea de comandos
-│   └── server/                 # Lógica del servidor
-│       ├── exporters/          # Módulos de exportación
-│       ├── import/             # Módulos de importación
-│       ├── backup/             # Escritura y checksums
-│       ├── schedules/          # Programación de backups
-│       └── validators/         # Validación de backups
-├── public/                     # Assets estáticos (logos)
-├── Dockerfile                  # Build multi-etapa para Docker
-├── docker-compose.yml          # Configuración Docker Compose
-└── .env.example                # Plantilla de variables de entorno
++-- src/
+|   +-- app/                    # Paginas Next.js App Router
+|   |   +-- page.tsx            # Pagina principal (login + dashboard)
+|   |   +-- layout.tsx          # Layout raiz con metadata
+|   |   +-- api/                # Rutas API
+|   |       +-- export/         # POST /api/export
+|   |       +-- import/         # POST /api/import
+|   |       +-- schedules/      # CRUD de schedules
+|   |       +-- backups/        # Gestion de backups
+|   |       +-- health/         # Health check
+|   +-- components/             # Componentes React client
+|   +-- cli/                    # Interfaz de linea de comandos
+|   +-- server/                 # Logica del servidor
+|       +-- exporters/          # Modulos de exportacion
+|       +-- import/             # Modulos de importacion
+|       +-- backup/             # Escritura y checksums
+|       +-- schedules/          # Programacion de backups
+|       +-- validators/         # Validacion de backups
++-- public/                     # Assets estaticos (logos)
++-- Dockerfile                  # Build multi-etapa para Docker
++-- docker-compose.yml          # Configuracion Docker Compose
++-- .env.example                # Plantilla de variables de entorno
 ```
 
 ## Orden de restauración
