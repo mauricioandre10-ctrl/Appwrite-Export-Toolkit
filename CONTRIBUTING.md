@@ -43,6 +43,14 @@ APP_LOGIN_PASSWORD=algoseguro
 
 # Dónde se guardan los backups
 BACKUP_OUTPUT_DIR=./backups
+
+# Protección CSRF (requerido, generar con: openssl rand -hex 32)
+APP_CSRF_SECRET=""
+
+# Runtime
+LOG_LEVEL="info"
+# SCHEDULER_DISABLED="1"
+# COOKIE_SECURE="1"
 ```
 
 Si querés probar import a otro proyecto, agregá las variables `TARGET_*`.
