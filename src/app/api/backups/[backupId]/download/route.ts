@@ -49,7 +49,13 @@ export async function POST(request: Request, context: RouteContext) {
 
   const { backupId } = await context.params;
   const config = loadAppwriteConfig();
-  const backupRoot = resolveManagedBackupPath(config.BACKUP_OUTPUT_DIR, backupId);
+
+  let backupRoot: string;
+  try {
+    backupRoot = resolveManagedBackupPath(config.BACKUP_OUTPUT_DIR, backupId);
+  } catch {
+    return NextResponse.json({ error: "Backup not found" }, { status: 404 });
+  }
 
   const passthrough = new PassThrough();
 

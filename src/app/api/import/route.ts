@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { isValidSessionToken, sessionCookieName } from "@/server/auth/session";
 import { validateCsrfToken, getCsrfTokenFromRequest } from "@/server/auth/csrf";
 import { createJobId, createJob, updateJob } from "@/server/import/progress-store";
+import { isSafeBackupId } from "@/server/backup/paths";
+import { isSessionRateLimited, recordSessionRequest } from "@/server/auth/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +35,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (sessionToken && isSessionRateLimited(sessionToken)) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   const csrfToken = await getCsrfTokenFromRequest(request);
   if (!(await validateCsrfToken(csrfToken))) {
     return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
+  }
+
+  if (sessionToken) {
+    recordSessionRequest(sessionToken);
   }
 
   let body: { backupId?: string; module?: string };
@@ -50,6 +60,10 @@ export async function POST(request: Request) {
 
   if (!backupId) {
     return NextResponse.json({ error: "backupId is required" }, { status: 400 });
+  }
+
+  if (!isSafeBackupId(backupId)) {
+    return NextResponse.json({ error: "invalid backupId format" }, { status: 400 });
   }
 
   const jobId = await createJobId("import");

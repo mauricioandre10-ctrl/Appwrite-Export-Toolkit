@@ -36,7 +36,7 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
@@ -44,17 +44,13 @@ const securityHeaders = [
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "upgrade-insecure-requests",
     ].join("; "),
   },
 ];
 
 const nextConfig: NextConfig = {
   output: "standalone",
-  allowedDevOrigins: [
-    "localhost",
-    "preview.tecnovacenter.com",
-    "backen.tecnovacenter.com",
-  ],
   async headers() {
     return [
       {

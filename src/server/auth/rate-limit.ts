@@ -59,3 +59,45 @@ export function recordFailedAttempt(ip: string): void {
 export function resetAttempts(ip: string): void {
   attempts.delete(ip);
 }
+
+// --- Rate limiting por sesión para rutas API ---
+
+type SessionLimitEntry = {
+  count: number;
+  resetAt: number;
+};
+
+const sessionLimits = new Map<string, SessionLimitEntry>();
+
+const API_MAX_REQUESTS = 10;
+const API_WINDOW_MS = 60 * 1000; // 1 minuto
+
+/**
+ * Verifica si una sesión ha excedido el límite de requests por ventana de tiempo.
+ * @param sessionToken - Token de sesión del usuario.
+ * @returns true si la sesión está limitada, false si puede continuar.
+ */
+export function isSessionRateLimited(sessionToken: string): boolean {
+  const entry = sessionLimits.get(sessionToken);
+  if (!entry) {
+    return false;
+  }
+  if (Date.now() > entry.resetAt) {
+    sessionLimits.delete(sessionToken);
+    return false;
+  }
+  return entry.count >= API_MAX_REQUESTS;
+}
+
+/**
+ * Incrementa el contador de requests para una sesión.
+ * @param sessionToken - Token de sesión del usuario.
+ */
+export function recordSessionRequest(sessionToken: string): void {
+  const entry = sessionLimits.get(sessionToken);
+  if (!entry || Date.now() > entry.resetAt) {
+    sessionLimits.set(sessionToken, { count: 1, resetAt: Date.now() + API_WINDOW_MS });
+    return;
+  }
+  entry.count += 1;
+}
