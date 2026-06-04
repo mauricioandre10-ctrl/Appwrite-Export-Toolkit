@@ -153,14 +153,32 @@ docker compose up --build
 # Acceder en http://localhost:3000
 ```
 
+El `docker-compose.yml` incluido monta un volumen persistente en `/data` para que los backups sobrevivan reinicios:
+
+```yaml
+services:
+  appwrite-export-toolkit:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      BACKUP_OUTPUT_DIR: "/data/backups"
+    volumes:
+      - appwrite-export-toolkit-data:/data
+    restart: unless-stopped
+
+volumes:
+  appwrite-export-toolkit-data:
+```
+
 ### Despliegue en producción
 
 1. Usar el `Dockerfile` incluido (build multi-etapa)
 2. Exponer puerto `3000`
-3. Montar volumen persistente en `/data`
+3. Montar volumen persistente en `/data` (ya incluido en `docker-compose.yml`)
 4. Los backups se escribirán en `/data/backups`
 
-Plataformas compatibles: EasyPanel, Docploy, cualquier plataforma que soporte Dockerfiles.
+Plataformas compatibles: EasyPanel, Dokploy, cualquier plataforma que soporte Dockerfiles.
 
 ## Variables de entorno
 
