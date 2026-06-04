@@ -277,7 +277,7 @@ npm run check         # Los tres anteriores combinados
 
 ## Documentación
 
-La documentación detallada se encuentra en el directorio [`docs/`](docs/):
+La documentación detallada se encuentra en el directorio [`docs/`](tree/main/docs/):
 
 | Documento | Descripción |
 |-----------|-------------|
