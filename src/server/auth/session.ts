@@ -1,4 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+import pino from "pino";
+
+const sessionLogger = pino({ level: process.env.LOG_LEVEL ?? "info" });
 
 /** Nombre de la cookie que almacena el token de sesión del usuario. */
 export const sessionCookieName = "appwrite_export_toolkit_session";
@@ -17,6 +20,12 @@ export type LoginConfig = {
 export function getLoginConfig(): LoginConfig {
   const user = process.env.APP_LOGIN_USER ?? "";
   const password = process.env.APP_LOGIN_PASSWORD ?? "";
+
+  if (user.length === 0 || password.length === 0) {
+    sessionLogger.warn(
+      "APP_LOGIN_USER and APP_LOGIN_PASSWORD must be set. Login is disabled until configured.",
+    );
+  }
 
   return {
     ready: user.length > 0 && password.length > 0,
