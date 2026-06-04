@@ -230,9 +230,9 @@ appwrite-export-toolkit/
 |   |   +-- backup-warnings.tsx     # Warnings de backups
 |   +-- cli/index.ts                # CLI con Commander (5 comandos)
 |   +-- server/
-|       +-- exporters/              # auth, database, storage, functions, messaging
+|       +-- exporters/              # auth, database, storage (functions/messaging planificados)
 |       +-- import/                 # orchestrator, progress-store, id-remapper
-|       |   +-- modules/            # auth, database, storage, functions, messaging, schema-restorer
+|       |   +-- modules/            # auth, database, storage (functions/messaging planificados)
 |       +-- backup/                 # backup-writer, checksum-service, paths, ndjson-writer
 |       +-- backups/                # catalog, delete-catalog, storage (list/delete/download)
 |       +-- schedules/              # scheduler-engine (cron), lock, running-jobs, schedule-runner
@@ -262,7 +262,8 @@ El orden de restauración es crítico y está garantizado por el orquestador:
 Esto es importante porque:
 - Los documentos pueden contener permisos `user:<id>`
 - Las filas de base de datos pueden referenciar IDs de archivos en Storage
-- Las funciones pueden depender de bases de datos y credenciales
+
+> **Nota:** Functions y Messaging tienen exportadores/importadores implementados pero aún no están conectados al orquestador. Actualmente solo se exportan/importan los 3 módulos listados arriba.
 
 ## Comandos de calidad
 
@@ -302,7 +303,8 @@ La documentación detallada se encuentra en el directorio [`docs/`](docs/):
 | `PUT` | `/api/schedules/[id]` | Actualizar un schedule |
 | `DELETE` | `/api/schedules/[id]` | Eliminar un schedule |
 | `POST` | `/api/schedules/[id]/run` | Ejecutar un schedule manualmente |
-| `GET` | `/api/jobs/[jobId]` | Consultar estado de un job en ejecución |
+| `GET` | `/api/jobs/[jobId]` | Consultar estado de un job |
+| `GET` | `/api/jobs/[jobId]/stream` | Stream SSE de progreso de un job |
 | `GET` | `/api/health` | Health check del servidor |
 
 ## Licencia
