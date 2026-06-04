@@ -66,6 +66,9 @@ docker-compose.override.yml
 # misc
 *.log
 
-# documentation (keep README.md)
+# documentation (keep README.md and docs/)
 *.md
 !README.md
+!CONTRIBUTING.md
+!AGENTS.md
+!docs/*.md
