@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { isValidSessionToken, sessionCookieName } from "@/server/auth/session";
+import { validateCsrfToken, getCsrfTokenFromRequest } from "@/server/auth/csrf";
 import { deleteSchedule, getSchedule, updateSchedule } from "@/server/schedules/storage";
 import { refreshAfterPatch, unregister } from "@/server/schedules/scheduler-engine";
 import { schedulePatchSchema } from "@/server/schedules/types";
@@ -27,6 +28,11 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
 
   if (!isValidSessionToken(sessionToken)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const csrfToken = await getCsrfTokenFromRequest(request);
+  if (!(await validateCsrfToken(csrfToken))) {
+    return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
   }
 
   const { id } = await context.params;
@@ -77,12 +83,17 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
   return NextResponse.json({ schedule: updated });
 }
 
-export async function DELETE(_request: Request, context: RouteContext): Promise<NextResponse> {
+export async function DELETE(request: Request, context: RouteContext): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;
 
   if (!isValidSessionToken(sessionToken)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const csrfToken = await getCsrfTokenFromRequest(request);
+  if (!(await validateCsrfToken(csrfToken))) {
+    return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
   }
 
   const { id } = await context.params;

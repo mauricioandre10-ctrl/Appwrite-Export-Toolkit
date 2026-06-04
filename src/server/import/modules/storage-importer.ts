@@ -88,7 +88,12 @@ export async function importStorage(
             continue;
           }
 
-          const fullBlobPath = path.join(backupRoot, blobPath);
+          const fullBlobPath = path.resolve(backupRoot, blobPath);
+          if (!fullBlobPath.startsWith(path.resolve(backupRoot))) {
+            result.errors.push(`Path traversal attempt blocked: ${sourceFileId}`);
+            result.status = "partial";
+            continue;
+          }
           let fileBuffer: Buffer;
           try {
             const { readFile: rf } = await import("node:fs/promises");

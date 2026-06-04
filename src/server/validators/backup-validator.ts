@@ -238,16 +238,22 @@ async function validateStorage(context: BackupContext, manifest: BackupManifest)
       validatePermissions(context, file.$permissions, `storage file ${bucketId}/${file.$id}`, filesPath);
 
       const blobPath = typeof file.blobPath === "string" ? file.blobPath : `storage/bucket_${bucketId}/blobs/${file.$id}`;
+      let blobExists = true;
       try {
         await access(path.join(/* turbopackIgnore: true */ context.root, blobPath));
       } catch {
+        blobExists = false;
         addIssue(context, "error", "storage.blob_missing", `Missing storage blob ${bucketId}/${file.$id}.`, blobPath);
       }
 
-      if (typeof file.blobSha256 === "string") {
-        const actualSha256 = await sha256File(path.join(/* turbopackIgnore: true */ context.root, blobPath));
-        if (actualSha256 !== file.blobSha256) {
-          addIssue(context, "error", "storage.blob_checksum", `Blob checksum mismatch for ${bucketId}/${file.$id}.`, blobPath);
+      if (blobExists && typeof file.blobSha256 === "string") {
+        try {
+          const actualSha256 = await sha256File(path.join(/* turbopackIgnore: true */ context.root, blobPath));
+          if (actualSha256 !== file.blobSha256) {
+            addIssue(context, "error", "storage.blob_checksum", `Blob checksum mismatch for ${bucketId}/${file.$id}.`, blobPath);
+          }
+        } catch {
+          addIssue(context, "error", "storage.blob_checksum", `Failed to compute checksum for ${bucketId}/${file.$id}.`, blobPath);
         }
       }
     }
@@ -345,8 +351,15 @@ function validateRestoreOrder(context: BackupContext, manifest: BackupManifest):
   const databaseIndex = actual.indexOf("databases");
   const storageIndex = actual.indexOf("storage");
 
-  if (authIndex > databaseIndex || authIndex > storageIndex) {
-    addIssue(context, "error", "restore_order.auth", "Auth must be restored before Databases and Storage.", "manifest.json");
+  if (authIndex === -1) {
+    addIssue(context, "error", "restore_order.missing_auth", "Auth is missing from restore order.", "manifest.json");
+  } else {
+    if (databaseIndex !== -1 && authIndex > databaseIndex) {
+      addIssue(context, "error", "restore_order.auth_before_databases", "Auth must be restored before Databases.", "manifest.json");
+    }
+    if (storageIndex !== -1 && authIndex > storageIndex) {
+      addIssue(context, "error", "restore_order.auth_before_storage", "Auth must be restored before Storage.", "manifest.json");
+    }
   }
 }
 
@@ -436,10 +449,17 @@ async function readJson(filePath: string): Promise<unknown> {
 
 async function readNdjson(filePath: string): Promise<unknown[]> {
   const content = await readFile(filePath, "utf8");
-  return content
-    .split("\n")
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line) as unknown);
+  const results: unknown[] = [];
+  for (const line of content.split("\n")) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    try {
+      results.push(JSON.parse(trimmed) as unknown);
+    } catch {
+      // Skip invalid lines instead of discarding all data
+    }
+  }
+  return results;
 }
 
 function compareCount(

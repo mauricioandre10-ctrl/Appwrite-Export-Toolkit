@@ -9,7 +9,11 @@ export class BackupWriter {
   constructor(private readonly rootDir: string) {}
 
   resolvePath(relativePath: string): string {
-    return path.join(this.rootDir, relativePath);
+    const resolved = path.resolve(this.rootDir, relativePath);
+    if (!resolved.startsWith(this.rootDir)) {
+      throw new Error(`Path traversal attempt blocked: ${relativePath}`);
+    }
+    return resolved;
   }
 
   async ensureDir(relativeDir = "."): Promise<string> {

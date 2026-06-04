@@ -22,13 +22,13 @@ export async function importFunctions(
       return result;
     }
 
-    const fnDirs = entries.filter((e) => e.startsWith("fn_"));
+    const fnDirs = entries.filter((e) => e.startsWith("function_"));
 
     for (const fnDir of fnDirs) {
-      const fnId = fnDir.replace("fn_", "");
+      const fnId = fnDir.replace("function_", "");
       const destFnId = remapper.getDestination("function", fnId) ?? fnId;
 
-      const fnJsonPath = path.join(functionsDir, fnDir, "function.json");
+      const fnJsonPath = path.join(functionsDir, fnDir, "meta.json");
       try {
         const fnContent = await readFile(fnJsonPath, "utf8");
         const fnData = JSON.parse(fnContent) as Record<string, unknown>;
@@ -60,7 +60,7 @@ export async function importFunctions(
           }
         }
 
-        const varsPath = path.join(functionsDir, fnDir, "env.json");
+        const varsPath = path.join(functionsDir, fnDir, "variables.json");
         try {
           const varsContent = await readFile(varsPath, "utf8");
           const vars = JSON.parse(varsContent) as Array<{ key: string; value: string }>;

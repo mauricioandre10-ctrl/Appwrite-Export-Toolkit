@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { isValidSessionToken, sessionCookieName } from "@/server/auth/session";
+import { validateCsrfToken, getCsrfTokenFromRequest } from "@/server/auth/csrf";
 import { getNextRun, register as registerSchedule } from "@/server/schedules/scheduler-engine";
 import { getCurrentJob } from "@/server/schedules/running-jobs";
 import { createSchedule, getSchedule, listScheduleSummaries } from "@/server/schedules/storage";
@@ -70,6 +71,11 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   if (!isValidSessionToken(sessionToken)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const csrfToken = await getCsrfTokenFromRequest(request);
+  if (!(await validateCsrfToken(csrfToken))) {
+    return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
   }
 
   let body: unknown;

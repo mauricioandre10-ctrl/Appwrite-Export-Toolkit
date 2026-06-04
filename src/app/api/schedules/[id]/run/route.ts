@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { isValidSessionToken, sessionCookieName } from "@/server/auth/session";
+import { validateCsrfToken, getCsrfTokenFromRequest } from "@/server/auth/csrf";
 import { createJob, createJobId, updateJob } from "@/server/import/progress-store";
 import { acquireLock, releaseLock } from "@/server/schedules/lock";
 import { appendRun } from "@/server/schedules/storage";
@@ -14,12 +15,17 @@ export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
-export async function POST(_request: Request, context: RouteContext): Promise<NextResponse> {
+export async function POST(request: Request, context: RouteContext): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;
 
   if (!isValidSessionToken(sessionToken)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const csrfToken = await getCsrfTokenFromRequest(request);
+  if (!(await validateCsrfToken(csrfToken))) {
+    return NextResponse.json({ error: "CSRF validation failed" }, { status: 403 });
   }
 
   const { id } = await context.params;

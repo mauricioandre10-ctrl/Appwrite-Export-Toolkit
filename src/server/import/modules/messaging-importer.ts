@@ -16,12 +16,13 @@ export async function importMessaging(
     const providersPath = path.join(backupRoot, "messaging", "providers.json");
     try {
       const content = await readFile(providersPath, "utf8");
-      const providers = JSON.parse(content) as Array<{ provider: Record<string, unknown> }>;
+      const providers = JSON.parse(content) as Array<Record<string, unknown>>;
 
-      for (const { provider } of providers) {
+      for (const provider of providers) {
         const sourceId = String(provider.$id ?? "");
+        const destId = remapper.getDestination("provider", sourceId) ?? sourceId;
         try {
-          await services.messaging.getProvider({ providerId: sourceId });
+          await services.messaging.getProvider({ providerId: destId });
           result.skipped += 1;
           continue;
         } catch {
@@ -36,10 +37,11 @@ export async function importMessaging(
             const serviceAccountRaw = (provider as Record<string, unknown>).serviceAccountJSON ?? "{}";
             const serviceAccountObj = typeof serviceAccountRaw === "string" ? JSON.parse(serviceAccountRaw) : serviceAccountRaw;
             await services.messaging.createFCMProvider({
-              providerId: sourceId,
+              providerId: destId,
               name: providerName,
               serviceAccountJSON: serviceAccountObj as Record<string, unknown>,
             });
+            remapper.addMapping("provider", sourceId, destId);
             result.created += 1;
           } else {
             result.skipped += 1;

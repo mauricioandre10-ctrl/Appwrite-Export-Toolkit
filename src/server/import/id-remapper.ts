@@ -4,7 +4,7 @@ import path from "node:path";
 export type IdMapping = {
   source: string;
   destination: string;
-  type: "user" | "team" | "database" | "collection" | "bucket" | "function" | "topic" | "document";
+  type: "user" | "team" | "database" | "collection" | "bucket" | "function" | "topic" | "document" | "provider";
 };
 
 export type IdRemapStore = {

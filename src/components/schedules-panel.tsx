@@ -5,6 +5,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ScheduleCard, type ScheduleViewModel } from "./schedule-card";
 import { ScheduleFormDialog, type ScheduleFormValues } from "./schedule-form-dialog";
 
+function getCsrfHeaders(): Record<string, string> {
+  if (typeof document === "undefined") return {};
+  const meta = document.querySelector('meta[name="csrf-token"]');
+  const token = meta?.getAttribute("content") ?? "";
+  return { "x-csrf-token": token };
+}
+
 type ApiSchedule = {
   id: string;
   name: string;
@@ -144,7 +151,7 @@ export function SchedulesPanel() {
   async function handleCreate(values: ScheduleFormValues) {
     const res = await fetch("/api/schedules", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getCsrfHeaders() },
       credentials: "same-origin",
       body: JSON.stringify(values),
     });
@@ -162,7 +169,7 @@ export function SchedulesPanel() {
     if (editing === null) return;
     const res = await fetch(`/api/schedules/${encodeURIComponent(editing.id)}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...getCsrfHeaders() },
       credentials: "same-origin",
       body: JSON.stringify(values),
     });
@@ -181,7 +188,7 @@ export function SchedulesPanel() {
     try {
       const res = await fetch(`/api/schedules/${encodeURIComponent(schedule.id)}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...getCsrfHeaders() },
         credentials: "same-origin",
         body: JSON.stringify({ enabled }),
       });
@@ -206,6 +213,7 @@ export function SchedulesPanel() {
     try {
       const res = await fetch(`/api/schedules/${encodeURIComponent(schedule.id)}`, {
         method: "DELETE",
+        headers: getCsrfHeaders(),
         credentials: "same-origin",
       });
       if (!res.ok) {
@@ -233,6 +241,7 @@ export function SchedulesPanel() {
     try {
       const res = await fetch(`/api/schedules/${encodeURIComponent(schedule.id)}/run`, {
         method: "POST",
+        headers: getCsrfHeaders(),
         credentials: "same-origin",
       });
       if (res.status === 409) {

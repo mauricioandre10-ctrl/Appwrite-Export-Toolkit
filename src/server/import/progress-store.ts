@@ -3,6 +3,21 @@ import { mkdirSync, accessSync } from "node:fs";
 import path from "node:path";
 import os from "node:os";
 
+const jobLocks = new Map<string, Promise<void>>();
+
+async function withJobLock<T>(jobId: string, fn: () => Promise<T>): Promise<T> {
+  const prev = jobLocks.get(jobId) ?? Promise.resolve();
+  const next = prev.then(fn, fn);
+  jobLocks.set(jobId, next.then(() => {}));
+  try {
+    return await next;
+  } finally {
+    if (jobLocks.get(jobId) === next.then(() => {})) {
+      jobLocks.delete(jobId);
+    }
+  }
+}
+
 export type JobStatus = "pending" | "running" | "completed" | "failed";
 
 export type JobProgress = {
@@ -87,21 +102,25 @@ export async function createJob(jobId: string, type: "import" | "export"): Promi
 }
 
 export async function updateJob(jobId: string, updates: Partial<Omit<JobProgress, "jobId" | "type">>): Promise<void> {
-  const job = await getJob(jobId);
-  if (job === undefined) return;
-  Object.assign(job, updates);
-  await writeJob(job);
+  await withJobLock(jobId, async () => {
+    const job = await getJob(jobId);
+    if (job === undefined) return;
+    Object.assign(job, updates);
+    await writeJob(job);
+  });
 }
 
 export async function completeJob(jobId: string, result?: unknown, error?: string): Promise<void> {
-  const job = await getJob(jobId);
-  if (job === undefined) return;
-  job.status = error ? "failed" : "completed";
-  job.percent = error ? job.percent : 100;
-  job.finishedAt = new Date().toISOString();
-  job.result = result;
-  job.error = error;
-  await writeJob(job);
+  await withJobLock(jobId, async () => {
+    const job = await getJob(jobId);
+    if (job === undefined) return;
+    job.status = error ? "failed" : "completed";
+    job.percent = error ? job.percent : 100;
+    job.finishedAt = new Date().toISOString();
+    job.result = result;
+    job.error = error;
+    await writeJob(job);
+  });
 }
 
 export async function getJob(jobId: string): Promise<JobProgress | undefined> {

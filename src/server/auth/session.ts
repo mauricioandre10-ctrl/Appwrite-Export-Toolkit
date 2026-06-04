@@ -24,7 +24,16 @@ export function createSessionToken(user: string, password: string): string {
 }
 
 export function isValidSessionToken(token: string | undefined, config = getLoginConfig()): boolean {
-  return config.ready && token === createSessionToken(config.user, config.password);
+  if (!config.ready || !token) {
+    return false;
+  }
+  const expectedToken = createSessionToken(config.user, config.password);
+  const tokenBuffer = Buffer.from(token, "utf8");
+  const expectedBuffer = Buffer.from(expectedToken, "utf8");
+  if (tokenBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+  return timingSafeEqual(tokenBuffer, expectedBuffer);
 }
 
 export function safeEqual(input: string, expected: string): boolean {

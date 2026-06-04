@@ -7,7 +7,7 @@ import { importAuth } from "./modules/auth-importer";
 import { importDatabases } from "./modules/database-importer";
 import { importStorage } from "./modules/storage-importer";
 import type { ImportModuleResult } from "./modules/auth-importer";
-import { updateJob, completeJob } from "./progress-store";
+import { updateJob } from "./progress-store";
 
 const log = pino({ level: "info" });
 
@@ -147,10 +147,6 @@ export async function importBackup(input: {
     await remapper.save(backupRoot);
   } catch {
     // Best effort - remapper save failure doesn't affect import result
-  }
-
-  if (jobId !== undefined) {
-    await completeJob(jobId, result);
   }
 
   log.info({ status: result.status, totalCreated: result.modules.reduce((a, m) => a + m.created, 0) }, "Import finished");

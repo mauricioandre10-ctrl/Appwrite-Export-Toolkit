@@ -51,9 +51,15 @@ export function ExportPanel({ configError }: { configError: string | null }) {
     setErrorMsg(null);
 
     try {
+      const csrfMeta = document.querySelector('meta[name="csrf-token"]');
+      const csrfToken = csrfMeta?.getAttribute("content") ?? "";
+
       const res = await fetch("/api/export", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-csrf-token": csrfToken,
+        },
         body: JSON.stringify({ module }),
         credentials: "same-origin",
       });
@@ -93,12 +99,18 @@ export function ExportPanel({ configError }: { configError: string | null }) {
       });
 
       es.onerror = () => {
-        es.close();
-        esRef.current = null;
-        if (loading) {
-          setLoading(false);
-          setErrorMsg("Conexión perdida con el servidor");
-        }
+        // Don't close - let EventSource auto-reconnect for transient errors.
+        // If the job is already complete, the server will close the connection.
+        // Show error only after a delay to allow reconnection.
+        if (!esRef.current) return;
+        setTimeout(() => {
+          if (esRef.current === es && loading) {
+            es.close();
+            esRef.current = null;
+            setLoading(false);
+            setErrorMsg("Conexión perdida con el servidor");
+          }
+        }, 5000);
       };
     } catch (err) {
       setLoading(false);

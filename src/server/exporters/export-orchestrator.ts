@@ -9,7 +9,7 @@ import { createBackupId, resolveBackupRoot } from "../backup/paths";
 import type { ExportModule } from "../backup/paths";
 import { createInitialManifest } from "../manifest/manifest-service";
 import type { BackupCounts, BackupModule } from "../types/backup";
-import { updateJob, completeJob } from "../import/progress-store";
+import { updateJob } from "../import/progress-store";
 import { exportAuth } from "./auth-exporter";
 import { exportDatabases } from "./database-exporter";
 import { exportStorage } from "./storage-exporter";
@@ -141,10 +141,6 @@ export async function exportBackup(input: {
     warnings: manifest.warnings,
     manifestPath: path.relative(process.cwd(), manifestPath),
   };
-
-  if (input.jobId !== undefined) {
-    await completeJob(input.jobId, summary);
-  }
 
   return summary;
 }

@@ -1,6 +1,5 @@
-import { createHash, timingSafeEqual } from "node:crypto";
-
 import Link from "next/link";
+import Image from "next/image";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -15,8 +14,27 @@ import { ImportPanel } from "@/components/import-panel";
 import { SchedulesPanel } from "@/components/schedules-panel";
 import { BackupWarnings } from "@/components/backup-warnings";
 import { PasswordInput } from "./password-input";
+import { CsrfTokenInput } from "./csrf-token";
+import { sessionCookieName, getLoginConfig, createSessionToken, safeEqual, isValidSessionToken } from "@/server/auth/session";
+import { validateCsrfToken, getCsrfToken } from "@/server/auth/csrf";
 
-const sessionCookieName = "appwrite_export_toolkit_session";
+function sanitizeErrorMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Error)) {
+    return fallback;
+  }
+  const msg = error.message;
+  if (msg.includes("/") || msg.includes("\\") || msg.includes("ENOENT") || msg.includes("EACCES")) {
+    return fallback;
+  }
+  return msg.slice(0, 80).replaceAll(" ", "_");
+}
+
+async function requireCsrf(formData: FormData): Promise<void> {
+  const token = formData.get("csrf_token");
+  if (!(await validateCsrfToken(typeof token === "string" ? token : null))) {
+    redirect("/?error=csrf_invalid");
+  }
+}
 
 type PageProps = {
   searchParams?: Promise<{
@@ -41,9 +59,11 @@ export default async function Home({ searchParams }: PageProps) {
   const loginConfig = getLoginConfig();
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(sessionCookieName)?.value;
-  const isAuthenticated =
-    loginConfig.ready && sessionCookie === createSessionToken(loginConfig.user, loginConfig.password);
+  const isAuthenticated = isValidSessionToken(sessionCookie);
   const params = await searchParams;
+
+  // Generate CSRF token for forms (stateless: HMAC of session + timestamp)
+  const csrfToken = await getCsrfToken();
 
   if (isAuthenticated) {
     const dashboardData = await getDashboardData();
@@ -54,12 +74,14 @@ export default async function Home({ searchParams }: PageProps) {
         outputDir={dashboardData.outputDir}
         configError={dashboardData.configError}
         params={params}
+        csrfToken={csrfToken}
       />
     );
   }
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#071015] text-slate-50">
+      <meta name="csrf-token" content={csrfToken ?? ""} />
       <BackgroundGlow />
       <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-8 sm:px-8 lg:px-10">
         <BrandHeader />
@@ -73,6 +95,7 @@ export default async function Home({ searchParams }: PageProps) {
               configReady={loginConfig.ready}
               hasError={params?.error === "invalid"}
               loggedOut={params?.loggedOut === "1"}
+              csrfToken={csrfToken}
             />
           </div>
         </section>
@@ -88,11 +111,13 @@ function DashboardShell({
   outputDir,
   configError,
   params,
+  csrfToken,
 }: {
   backups: BackupSummary[];
   outputDir: string;
   configError: string | null;
   params?: Awaited<PageProps["searchParams"]>;
+  csrfToken?: string | null | undefined;
 }) {
   const latest = backups[0];
   const activeTab: "export" | "import" | "schedules" =
@@ -100,6 +125,7 @@ function DashboardShell({
 
   return (
     <main className="min-h-screen bg-[#071015] text-slate-50">
+      <meta name="csrf-token" content={csrfToken ?? ""} />
       <BackgroundGlow />
       <div className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
         <header className="flex flex-col gap-4 rounded-[1.75rem] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between">
@@ -109,6 +135,7 @@ function DashboardShell({
               {outputDir}
             </span>
             <form action={logoutAction}>
+              <CsrfTokenInput token={csrfToken} />
               <button className="rounded-full border border-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/10">
                 Cerrar sesion
               </button>
@@ -125,11 +152,11 @@ function DashboardShell({
         ) : activeTab === "schedules" ? (
           <SchedulesSection />
         ) : (
-          <ExportSection backups={backups} latest={latest} configError={configError} />
+          <ExportSection backups={backups} latest={latest} configError={configError} csrfToken={csrfToken} />
         )}
 
         {params?.deleteConfirm !== undefined ? (
-          <DeleteConfirmModal backupId={params.deleteConfirm} />
+          <DeleteConfirmModal backupId={params.deleteConfirm} csrfToken={csrfToken} />
         ) : null}
 
         {params?.deleted !== undefined ? (
@@ -193,11 +220,13 @@ function ExportSection({
   backups,
   latest,
   configError,
+  csrfToken,
 }: {
   backups: BackupSummary[];
   latest: BackupSummary | undefined;
   configError: string | null;
   params?: Awaited<PageProps["searchParams"]>;
+  csrfToken?: string | null | undefined;
 }) {
   const totalFiles = latest?.counts.files ?? 0;
   const totalDocuments = latest?.counts.documents ?? 0;
@@ -217,7 +246,7 @@ function ExportSection({
             <p className="mt-3 max-w-lg text-sm leading-6 text-slate-300 sm:text-base">
               Lanza backups por modulo, valida integridad y revisa estado por recurso sin salir del panel.
             </p>
-            <StatusPill status={latest?.moduleStatus.databases === "partial" ? "partial" : "complete"} />
+            <StatusPill status={Object.values(latest?.moduleStatus ?? {}).some(s => s !== "complete") ? "partial" : "complete"} />
           </div>
 
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
@@ -237,8 +266,8 @@ function ExportSection({
       </section>
 
       <section className="grid gap-5 pb-8 lg:grid-cols-[0.95fr_1.05fr]">
-        <LatestBackupCard backup={latest} />
-        <BackupHistory backups={backups} />
+        <LatestBackupCard backup={latest} csrfToken={csrfToken} />
+        <BackupHistory backups={backups} csrfToken={csrfToken} />
       </section>
     </>
   );
@@ -345,7 +374,7 @@ function AlertPanel({
   return null;
 }
 
-function LatestBackupCard({ backup }: { backup: BackupSummary | undefined }) {
+function LatestBackupCard({ backup, csrfToken }: { backup: BackupSummary | undefined; csrfToken?: string | null | undefined }) {
   if (backup === undefined) {
     return (
       <div className="rounded-[2rem] border border-dashed border-white/15 bg-white/[0.04] p-6">
@@ -395,6 +424,7 @@ function LatestBackupCard({ backup }: { backup: BackupSummary | undefined }) {
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row">
         <form action={validateAction} className="flex-1">
+          <CsrfTokenInput token={csrfToken} />
           <input name="backupId" type="hidden" value={backup.backupId} />
           <SubmitButton label="Validar" icon="check" />
         </form>
@@ -403,6 +433,7 @@ function LatestBackupCard({ backup }: { backup: BackupSummary | undefined }) {
           action={`/api/backups/${encodeURIComponent(backup.backupId)}/download`}
           className="flex-1"
         >
+          <CsrfTokenInput token={csrfToken} />
           <button
             type="submit"
             className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-emerald-300/30 bg-emerald-300/10 px-5 font-bold text-emerald-200 transition hover:bg-emerald-300/20"
@@ -415,7 +446,7 @@ function LatestBackupCard({ backup }: { backup: BackupSummary | undefined }) {
   );
 }
 
-function BackupHistory({ backups }: { backups: BackupSummary[] }) {
+function BackupHistory({ backups, csrfToken }: { backups: BackupSummary[]; csrfToken?: string | null | undefined }) {
   return (
     <div className="rounded-[2rem] border border-white/10 bg-slate-950/50 p-6">
       <div className="flex items-center justify-between gap-4">
@@ -439,6 +470,7 @@ function BackupHistory({ backups }: { backups: BackupSummary[] }) {
                   method="POST"
                   action={`/api/backups/${encodeURIComponent(backup.backupId)}/download`}
                 >
+                  <CsrfTokenInput token={csrfToken} />
                   <button
                     type="submit"
                     className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-xs font-bold text-emerald-200 transition hover:bg-emerald-300/20"
@@ -447,10 +479,12 @@ function BackupHistory({ backups }: { backups: BackupSummary[] }) {
                   </button>
                 </form>
                 <form action={validateAction}>
+                  <CsrfTokenInput token={csrfToken} />
                   <input name="backupId" type="hidden" value={backup.backupId} />
                   <SubmitButton label="Validar" icon="check" compact />
                 </form>
                 <form action={deleteConfirmAction}>
+                  <CsrfTokenInput token={csrfToken} />
                   <input name="backupId" type="hidden" value={backup.backupId} />
                   <button
                     type="submit"
@@ -482,11 +516,13 @@ function LoginPanel({
   configReady,
   hasError,
   loggedOut,
+  csrfToken,
 }: {
   action: (formData: FormData) => Promise<void>;
   configReady: boolean;
   hasError: boolean;
   loggedOut: boolean;
+  csrfToken?: string | null | undefined;
 }) {
   return (
     <div>
@@ -498,6 +534,7 @@ function LoginPanel({
       {loggedOut ? <InlineNotice tone="success" message="Sesion cerrada correctamente." /> : null}
 
       <form action={action} className="mt-7 space-y-5">
+        <CsrfTokenInput token={csrfToken} />
         <label className="block">
           <span className="text-sm font-medium text-slate-200">Usuario</span>
           <input
@@ -657,9 +694,11 @@ function BackgroundGlow() {
 function BrandHeader({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3 sm:gap-4">
-      <img
+      <Image
         src="/logo_aet2_512x512.webp"
         alt="Appwrite Export Toolkit"
+        width={56}
+        height={56}
         className="size-11 rounded-xl object-cover sm:size-12 lg:size-14"
       />
       <div className="min-w-0">
@@ -677,9 +716,11 @@ function BrandHeader({ compact = false }: { compact?: boolean }) {
 function HeroCopy() {
   return (
     <div className="max-w-2xl">
-      <img
+      <Image
         src="/logo_aet.webp"
         alt="Appwrite Export Toolkit"
+        width={256}
+        height={256}
         className="mb-8 w-48 rounded-2xl object-cover shadow-2xl shadow-black/40 sm:w-56 lg:w-64"
       />
       <h1 className="text-4xl font-black tracking-tight text-white sm:text-6xl">
@@ -741,7 +782,7 @@ function InlineNotice({ tone, message }: { tone: "success" | "warning" | "error"
   return <div className={`mt-6 rounded-2xl border p-4 text-sm ${toneClass}`}>{message}</div>;
 }
 
-async function DeleteConfirmModal({ backupId }: { backupId: string }) {
+async function DeleteConfirmModal({ backupId, csrfToken }: { backupId: string; csrfToken?: string | null | undefined }) {
   let info;
   try {
     const config = loadAppwriteConfig();
@@ -802,6 +843,7 @@ async function DeleteConfirmModal({ backupId }: { backupId: string }) {
             Cancelar
           </Link>
           <form action={deleteAction} className="flex-1">
+            <CsrfTokenInput token={csrfToken} />
             <input name="backupId" type="hidden" value={backupId} />
             <button
               type="submit"
@@ -840,7 +882,7 @@ async function getDashboardData(): Promise<{
     return {
       backups: [],
       outputDir: "sin configurar",
-      configError: error instanceof Error ? error.message : "Configuracion invalida.",
+      configError: sanitizeErrorMessage(error, "Configuracion invalida."),
     };
   }
 }
@@ -849,6 +891,7 @@ async function validateAction(formData: FormData) {
   "use server";
 
   await requireAuthenticated();
+  await requireCsrf(formData);
 
   const backupId = String(formData.get("backupId") ?? "");
   let errors = 0;
@@ -861,7 +904,7 @@ async function validateAction(formData: FormData) {
     errors = result.counts.errors;
     warnings = result.counts.warnings;
   } catch (error) {
-    const reason = error instanceof Error ? error.message.slice(0, 80).replaceAll(" ", "_") : "validate_failed";
+    const reason = sanitizeErrorMessage(error, "validate_failed");
     redirect(`/?actionError=${encodeURIComponent(reason)}`);
   }
 
@@ -874,6 +917,7 @@ async function deleteConfirmAction(formData: FormData) {
   "use server";
 
   await requireAuthenticated();
+  await requireCsrf(formData);
 
   const backupId = String(formData.get("backupId") ?? "");
   redirect(`/?deleteConfirm=${encodeURIComponent(backupId)}`);
@@ -883,6 +927,7 @@ async function deleteAction(formData: FormData) {
   "use server";
 
   await requireAuthenticated();
+  await requireCsrf(formData);
 
   const backupId = String(formData.get("backupId") ?? "");
 
@@ -890,7 +935,7 @@ async function deleteAction(formData: FormData) {
     const config = loadAppwriteConfig();
     await deleteBackup(config.BACKUP_OUTPUT_DIR, backupId);
   } catch (error) {
-    const reason = error instanceof Error ? error.message.slice(0, 80).replaceAll(" ", "_") : "delete_failed";
+    const reason = sanitizeErrorMessage(error, "delete_failed");
     redirect(`/?actionError=${encodeURIComponent(reason)}`);
   }
 
@@ -904,15 +949,17 @@ async function loginAction(formData: FormData) {
   const user = String(formData.get("user") ?? "");
   const password = String(formData.get("password") ?? "");
 
+  // CSRF not required for login (first form submission)
   if (!loginConfig.ready || !safeEqual(user, loginConfig.user) || !safeEqual(password, loginConfig.password)) {
     redirect("/?error=invalid");
   }
 
   const cookieStore = await cookies();
+  const isSecure = process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "1";
   cookieStore.set(sessionCookieName, createSessionToken(loginConfig.user, loginConfig.password), {
     httpOnly: true,
     sameSite: "lax",
-    secure: false,
+    secure: isSecure,
     path: "/",
     maxAge: 60 * 60 * 8,
   });
@@ -920,8 +967,10 @@ async function loginAction(formData: FormData) {
   redirect("/");
 }
 
-async function logoutAction() {
+async function logoutAction(formData: FormData) {
   "use server";
+
+  await requireCsrf(formData);
 
   const cookieStore = await cookies();
   cookieStore.delete(sessionCookieName);
@@ -929,35 +978,12 @@ async function logoutAction() {
 }
 
 async function requireAuthenticated(): Promise<void> {
-  const loginConfig = getLoginConfig();
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(sessionCookieName)?.value;
 
-  if (!loginConfig.ready || sessionCookie !== createSessionToken(loginConfig.user, loginConfig.password)) {
+  if (!isValidSessionToken(sessionCookie)) {
     redirect("/?error=invalid");
   }
-}
-
-function getLoginConfig() {
-  const user = process.env.APP_LOGIN_USER ?? "";
-  const password = process.env.APP_LOGIN_PASSWORD ?? "";
-
-  return {
-    ready: user.length > 0 && password.length > 0,
-    user,
-    password,
-  };
-}
-
-function createSessionToken(user: string, password: string): string {
-  return createHash("sha256").update(`${user}:${password}`).digest("hex");
-}
-
-function safeEqual(input: string, expected: string): boolean {
-  const inputHash = createHash("sha256").update(input).digest();
-  const expectedHash = createHash("sha256").update(expected).digest();
-
-  return timingSafeEqual(inputHash, expectedHash);
 }
 
 function Footer() {
