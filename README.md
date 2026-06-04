@@ -219,27 +219,45 @@ Plataformas compatibles: EasyPanel, Dokploy, cualquier plataforma que soporte Do
 ```
 appwrite-export-toolkit/
 +-- src/
-|   +-- app/                    # Paginas Next.js App Router
-|   |   +-- page.tsx            # Pagina principal (login + dashboard)
-|   |   +-- layout.tsx          # Layout raiz con metadata
-|   |   +-- api/                # Rutas API
-|   |       +-- export/         # POST /api/export
-|   |       +-- import/         # POST /api/import
-|   |       +-- schedules/      # CRUD de schedules
-|   |       +-- backups/        # Gestion de backups
-|   |       +-- health/         # Health check
-|   +-- components/             # Componentes React client
-|   +-- cli/                    # Interfaz de linea de comandos
-|   +-- server/                 # Logica del servidor
-|       +-- exporters/          # Modulos de exportacion
-|       +-- import/             # Modulos de importacion
-|       +-- backup/             # Escritura y checksums
-|       +-- schedules/          # Programacion de backups
-|       +-- validators/         # Validacion de backups
-+-- public/                     # Assets estaticos (logos)
-+-- Dockerfile                  # Build multi-etapa para Docker
-+-- docker-compose.yml          # Configuracion Docker Compose
-+-- .env.example                # Plantilla de variables de entorno
+|   +-- app/                        # Next.js App Router
+|   |   +-- page.tsx                # Login + dashboard (SPA)
+|   |   +-- layout.tsx              # Layout raiz
+|   |   +-- api/
+|   |       +-- export/route.ts     # POST (SSE) + GET jobs
+|   |       +-- import/route.ts     # POST (SSE) + GET jobs
+|   |       +-- backups/            # GET list, POST download
+|   |       +-- schedules/          # CRUD + POST run
+|   |       +-- jobs/               # GET status + GET stream (SSE)
+|   |       +-- health/route.ts     # GET health check
+|   +-- components/                 # React client components
+|   |   +-- export-panel.tsx        # Panel de exportacion con SSE
+|   |   +-- import-panel.tsx        # Panel de importacion con SSE
+|   |   +-- schedules-panel.tsx     # Gestion de schedules
+|   |   +-- schedule-card.tsx       # Card individual de schedule
+|   |   +-- schedule-form-dialog.tsx# Formulario crear/editar
+|   |   +-- progress-bar.tsx        # Barra de progreso SSE
+|   |   +-- backup-warnings.tsx     # Warnings de backups
+|   +-- cli/index.ts                # CLI con Commander (5 comandos)
+|   +-- server/
+|       +-- exporters/              # auth, database, storage, functions, messaging
+|       +-- import/                 # orchestrator, progress-store, id-remapper
+|       |   +-- modules/            # auth, database, storage, functions, messaging, schema-restorer
+|       +-- backup/                 # backup-writer, checksum-service, paths, ndjson-writer
+|       +-- backups/                # catalog, delete-catalog, storage (list/delete/download)
+|       +-- schedules/              # scheduler-engine (cron), lock, running-jobs, schedule-runner
+|       +-- jobs/                   # job-streamer (SSE)
+|       +-- validators/             # backup-validator (integridad)
+|       +-- inspectors/             # project-inspector
+|       +-- auth/                   # session, csrf (HMAC stateless)
+|       +-- appwrite/               # client, config, http-download
+|       +-- manifest/               # manifest-service
+|       +-- utils/                  # logger, pagination, retry, json
+|       +-- types/                  # backup, export-result
++-- docs/                           # 8 guias detalladas
++-- public/                         # Logos
++-- Dockerfile                      # Build multi-etapa
++-- docker-compose.yml              # Volumen persistente en /data
++-- .env.example                    # Plantilla de variables
 ```
 
 ## Orden de restauración
