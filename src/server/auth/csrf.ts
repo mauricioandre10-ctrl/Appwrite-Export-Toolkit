@@ -1,19 +1,16 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
-const CSRF_SECRET = process.env.APP_CSRF_SECRET;
-if (!CSRF_SECRET) {
-  throw new Error(
-    "APP_CSRF_SECRET is required. Generate with: openssl rand -hex 32",
-  );
-}
 const TOKEN_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 
 function getSecret(): string {
-  if (!CSRF_SECRET) {
-    throw new Error("APP_CSRF_SECRET is required");
+  const secret = process.env.APP_CSRF_SECRET;
+  if (!secret) {
+    throw new Error(
+      "APP_CSRF_SECRET is required. Generate with: openssl rand -hex 32",
+    );
   }
-  return CSRF_SECRET;
+  return secret;
 }
 
 /**
