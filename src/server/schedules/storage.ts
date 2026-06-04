@@ -88,6 +88,12 @@ function toSummary(schedule: Schedule): ScheduleSummary {
   };
 }
 
+/**
+ * Devuelve la lista completa de schedules persistidos en disco, ordenados
+ * por fecha de creación de forma ascendente.
+ *
+ * @returns Arreglo de objetos Schedule con todos los campos.
+ */
 export function listSchedules(): Schedule[] {
   const dir = resolveSchedulesDir();
   let entries: string[];
@@ -115,10 +121,23 @@ export function listSchedules(): Schedule[] {
   return schedules;
 }
 
+/**
+ * Devuelve una versión resumida de todos los schedules, incluyendo solo
+ * los campos necesarios para listados y vistas previas.
+ *
+ * @returns Arreglo de objetos ScheduleSummary.
+ */
 export function listScheduleSummaries(): ScheduleSummary[] {
   return listSchedules().map(toSummary);
 }
 
+/**
+ * Busca y devuelve un schedule por su ID. Si no existe o el archivo
+ * es inválido, devuelve null.
+ *
+ * @param id - Identificador único del schedule.
+ * @returns El objeto Schedule o null si no se encuentra.
+ */
 export function getSchedule(id: string): Schedule | null {
   const filePath = scheduleFilePath(id);
   return parseScheduleFile(filePath);
@@ -133,6 +152,13 @@ function persistSchedule(schedule: Schedule): Schedule {
   return validated;
 }
 
+/**
+ * Crea un nuevo schedule a partir de los datos de entrada, genera un ID
+ * único y lo persiste en disco.
+ *
+ * @param input - Datos de configuración del schedule (nombre, cron, módulo, etc.).
+ * @returns El objeto Schedule creado con los campos de control (id, fechas, historial vacío).
+ */
 export function createSchedule(input: ScheduleInput): Schedule {
   const now = new Date().toISOString();
   const id = `sch_${randomUUID().replace(/-/g, "").slice(0, 16)}`;
@@ -153,6 +179,14 @@ export function createSchedule(input: ScheduleInput): Schedule {
   return persistSchedule(schedule);
 }
 
+/**
+ * Aplica un parche parcial a un schedule existente. Solo se modifican
+ * los campos incluidos en el patch; el resto se conserva.
+ *
+ * @param id - Identificador del schedule a actualizar.
+ * @param patch - Campos a modificar (parcial).
+ * @returns El schedule actualizado o null si no se encontró.
+ */
 export function updateSchedule(id: string, patch: SchedulePatch): Schedule | null {
   const current = getSchedule(id);
   if (current === null) return null;
@@ -171,6 +205,12 @@ export function updateSchedule(id: string, patch: SchedulePatch): Schedule | nul
   return persistSchedule(next);
 }
 
+/**
+ * Elimina el archivo JSON de un schedule del disco.
+ *
+ * @param id - Identificador del schedule a eliminar.
+ * @returns true si se eliminó correctamente, false si hubo un error.
+ */
 export function deleteSchedule(id: string): boolean {
   const filePath = scheduleFilePath(id);
   try {
@@ -182,6 +222,14 @@ export function deleteSchedule(id: string): boolean {
   }
 }
 
+/**
+ * Registra una ejecución en el historial del schedule. El historial se
+ * mantiene ordenado cronológicamente y se recorta al límite máximo.
+ *
+ * @param id - Identificador del schedule al que se agrega la ejecución.
+ * @param run - Datos de la ejecución (estado, fechas, jobId asociado).
+ * @returns El schedule actualizado o null si no se encontró.
+ */
 export function appendRun(id: string, run: ScheduleRun): Schedule | null {
   const current = getSchedule(id);
   if (current === null) return null;
@@ -201,6 +249,14 @@ export function appendRun(id: string, run: ScheduleRun): Schedule | null {
   });
 }
 
+/**
+ * Actualiza la fecha de la próxima ejecución programada de un schedule.
+ * Se usa para reprogramar o cancelar la siguiente ejecución.
+ *
+ * @param id - Identificador del schedule.
+ * @param nextRunAt - Fecha ISO de la próxima ejecución, o undefined para desprogramar.
+ * @returns El schedule actualizado o null si no se encontró.
+ */
 export function setNextRun(id: string, nextRunAt: string | undefined): Schedule | null {
   const current = getSchedule(id);
   if (current === null) return null;
@@ -214,10 +270,22 @@ export function setNextRun(id: string, nextRunAt: string | undefined): Schedule 
   return persistSchedule(next);
 }
 
+/**
+ * Devuelve la ruta del directorio donde se almacenan los archivos de schedules.
+ * Si el directorio aún no fue resuelto, lo inicializa en ese momento.
+ *
+ * @returns Ruta absoluta del directorio de schedules.
+ */
 export function getSchedulesDir(): string {
   return resolveSchedulesDir();
 }
 
+/**
+ * Resetea la caché del directorio de schedules, forzando que la próxima
+ * llamada a getSchedulesDir() resuelva el directorio nuevamente.
+ *
+ * @returns void
+ */
 export function resetSchedulesDirCache(): void {
   cachedDir = null;
 }

@@ -25,6 +25,13 @@ export type BackupLogEntry = {
   data: Record<string, unknown>;
 };
 
+/**
+ * Lista todos los backups disponibles en el directorio de salida,
+ * leyendo sus manifiestos y devolviendo un resumen ordenado por fecha de exportación.
+ *
+ * @param outputDir - Directorio raíz donde se encuentran los backups.
+ * @returns Arreglo de resúmenes de backups, ordenados del más reciente al más antiguo.
+ */
 export async function listBackupSummaries(outputDir: string): Promise<BackupSummary[]> {
   const root = path.resolve(/* turbopackIgnore: true */ outputDir);
   let entries: string[];
@@ -70,6 +77,13 @@ export async function listBackupSummaries(outputDir: string): Promise<BackupSumm
     .sort((a, b) => b.exportedAt.localeCompare(a.exportedAt));
 }
 
+/**
+ * Lee las últimas entradas de log de un backup específico.
+ *
+ * @param backupRoot - Ruta absoluta del directorio del backup.
+ * @param limit - Cantidad máxima de entradas a devolver (por defecto 50).
+ * @returns Arreglo de entradas de log parseadas, ordenadas cronológicamente.
+ */
 export async function readBackupLogs(backupRoot: string, limit = 50): Promise<BackupLogEntry[]> {
   try {
     const content = await readFile(path.join(/* turbopackIgnore: true */ backupRoot, "logs/export.log"), "utf8");
@@ -130,6 +144,14 @@ function isBackupSummary(value: BackupSummary | null): value is BackupSummary {
   return value !== null;
 }
 
+/**
+ * Resuelve la ruta absoluta de un backup validando que el ID sea seguro
+ * y que la ruta resultante no escape del directorio de salida configurado.
+ *
+ * @param outputDir - Directorio raíz donde se almacenan los backups.
+ * @param backupId - Identificador del backup a resolver.
+ * @returns La ruta absoluta validada del directorio del backup.
+ */
 export function resolveManagedBackupPath(outputDir: string, backupId: string): string {
   if (!isSafeBackupId(backupId)) {
     throw new Error("Invalid backup ID.");

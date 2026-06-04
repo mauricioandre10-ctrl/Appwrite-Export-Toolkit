@@ -7,6 +7,7 @@ import { createJobId, createJob, updateJob } from "@/server/import/progress-stor
 
 export const dynamic = "force-dynamic";
 
+/** Lanza una tarea de exportación y devuelve el ID del trabajo creado. */
 export async function POST(request: Request) {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;

@@ -1,3 +1,9 @@
+/**
+ * Tests para el job-streamer — verifica el streaming SSE de jobs de export e import.
+ * Valida que se ejecute la operación correcta según el estado del job (pending, running,
+ * completed, failed), que se emitan eventos de progreso/complete/error correctamente,
+ * y que un subscriber solo observe sin re-ejecutar cuando el job ya está en ejecución.
+ */
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";

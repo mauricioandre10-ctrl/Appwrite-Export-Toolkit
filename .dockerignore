@@ -1,3 +1,6 @@
+# Archivos ignorados para builds de Docker.
+# Excluye dependencias, artefactos de build, secrets y documentación
+# que no son necesarios dentro del contenedor.
 .git
 .next
 node_modules

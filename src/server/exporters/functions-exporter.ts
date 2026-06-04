@@ -6,6 +6,7 @@ import { listAll } from "../utils/pagination";
 import { omitSensitiveFields } from "./sanitize";
 import type { JsonObject, ModuleExportResult } from "./types";
 
+/** Exporta funciones, variables (redactadas) y descarga los deployments de código fuente. */
 export async function exportFunctions(config: AppwriteConfig, services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("functions");
 

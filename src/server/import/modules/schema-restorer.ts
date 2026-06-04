@@ -50,6 +50,16 @@ const RELATIONSHIP_TYPES = ["oneToOne", "oneToMany", "manyToOne", "manyToMany"];
 const ATTRIBUTE_POLL_MAX_ATTEMPTS = 30;
 const ATTRIBUTE_POLL_INTERVAL_MS = 2000;
 
+/**
+ * Restaura la estructura completa de esquemas (colecciones, atributos e índices)
+ * desde un archivo schema.json generado por una exportación previa.
+ *
+ * @param services - Instancia de AppwriteServices con los clientes necesarios para operar sobre la base de datos.
+ * @param backupRoot - Ruta al directorio raíz del backup que contiene el archivo databases/schema.json.
+ * @param remapper - Instancia de IdRemapper para traducir los IDs originales a los nuevos destinos.
+ * @param log - Logger opcional de pino para registrar el progreso de la restauración.
+ * @returns Resultado del módulo de importación con el conteo de elementos creados, omitidos y errores encontrados.
+ */
 export async function restoreSchema(
   services: AppwriteServices,
   backupRoot: string,
@@ -306,6 +316,12 @@ async function createAttributeFromExport(
   }
 }
 
+// Appwrite procesa la creación de atributos de forma asíncrona:
+// la API responde inmediatamente con status "processing", pero el
+// atributo no está realmente listo hasta que su status sea "available".
+// Indices y otros atributos dependientes no se pueden crear hasta que
+// los atributos base estén disponibles, así que hacemos polling con
+// un intervalo de 2s y máximo de 30 intentos (~60s) antes de rendirnos.
 async function waitForAttributesAvailable(
   services: AppwriteServices,
   databaseId: string,
@@ -323,7 +339,7 @@ async function waitForAttributesAvailable(
           break;
         }
       } catch {
-        // Attribute not found yet, keep polling
+        // Atributo aún no existe en el backend, seguimos intentando
       }
       await new Promise((resolve) => setTimeout(resolve, ATTRIBUTE_POLL_INTERVAL_MS));
     }

@@ -1,3 +1,5 @@
+# Archivos y carpetas que Git ignora: dependencias, builds, secrets,
+# backups generados y otros artefactos que no deben ir al repositorio.
 # dependencies
 /node_modules
 /.pnp

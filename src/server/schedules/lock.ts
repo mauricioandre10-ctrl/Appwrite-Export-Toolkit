@@ -11,6 +11,10 @@ function lockFilePath(scheduleId: string): string {
   return path.join(getSchedulesDir(), `${safe}.lock`);
 }
 
+/**
+ * Intenta adquirir un lock exclusivo para un schedule.
+ * Retorna true si se obtuvo el lock, false si ya está ocupado.
+ */
 export function acquireLock(scheduleId: string): boolean {
   const filePath = lockFilePath(scheduleId);
 
@@ -40,6 +44,7 @@ export function acquireLock(scheduleId: string): boolean {
   }
 }
 
+/** Libera el lock de un schedule, eliminando el archivo de lock del disco. */
 export function releaseLock(scheduleId: string): void {
   const filePath = lockFilePath(scheduleId);
   try {
@@ -61,6 +66,7 @@ function isLockStale(filePath: string): boolean {
   }
 }
 
+/** Verifica si un schedule tiene un lock activo en disco. */
 export function isLocked(scheduleId: string): boolean {
   const filePath = lockFilePath(scheduleId);
   try {

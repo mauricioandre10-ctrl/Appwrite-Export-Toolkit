@@ -2,6 +2,7 @@ import type { AppwriteConfig } from "../appwrite/config";
 import type { AppwriteServices } from "../appwrite/client";
 import { listAll } from "../utils/pagination";
 
+/** Resultado de la inspección de un proyecto Appwrite, con conteos por servicio y advertencias. */
 export type ProjectInspection = {
   endpoint: string;
   projectId: string;
@@ -17,6 +18,12 @@ export type ProjectInspection = {
   warnings: string[];
 };
 
+/**
+ * Inspecciona un proyecto Appwrite y obtiene el conteo de cada servicio disponible.
+ * @param config - Configuración de conexión al proyecto Appwrite.
+ * @param services - Instancias de servicios de Appwrite para listar recursos.
+ * @returns Resultado de la inspección con conteos y advertencias.
+ */
 export async function inspectProject(
   config: AppwriteConfig,
   services: AppwriteServices,

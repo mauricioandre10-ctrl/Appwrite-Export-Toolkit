@@ -42,6 +42,7 @@ function formatDate(value: string): string {
   }
 }
 
+/** Panel para importar un backup existente con selección de módulo y progreso en vivo. */
 export function ImportPanel({
   backups,
   configError,

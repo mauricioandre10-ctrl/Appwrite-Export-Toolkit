@@ -1,3 +1,8 @@
+/*
+ * Estilos globales de la aplicación.
+ * Incluye la importación de Tailwind CSS, variables CSS personalizadas
+ * y estilos base para el body.
+ */
 @import "tailwindcss";
 
 :root {

@@ -63,6 +63,7 @@ function toViewModel(s: ApiSchedule): ScheduleViewModel {
   };
 }
 
+/** Panel de gestión de backups programados: crear, editar, ejecutar y eliminar schedules. */
 export function SchedulesPanel() {
   const [schedules, setSchedules] = useState<ScheduleViewModel[]>([]);
   const [loading, setLoading] = useState(true);

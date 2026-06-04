@@ -1,3 +1,7 @@
+/**
+ * Tests para el registro de jobs en ejecución — verifica el store en memoria
+ * que mapea scheduleId → jobId, incluyendo set, get, clear y list.
+ */
 import { afterEach, describe, expect, it } from "vitest";
 
 import { clearCurrentJob, getCurrentJob, listCurrentJobs, setCurrentJob } from "./running-jobs";

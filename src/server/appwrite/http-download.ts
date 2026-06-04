@@ -9,12 +9,17 @@ import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import type { AppwriteConfig } from "./config";
 import { withRetry } from "../utils/retry";
 
+/** Resultado de una descarga de archivo desde Appwrite. */
 export type DownloadResult = {
+  /** Ruta local donde se guardó el archivo descargado. */
   filePath: string;
+  /** Hash SHA-256 del contenido descargado, en hexadecimal. */
   sha256: string;
+  /** Cantidad total de bytes descargados. */
   bytes: number;
 };
 
+/** Descarga un archivo de Storage de Appwrite y lo guarda en disco con verificación SHA-256. */
 export async function downloadStorageFile(input: {
   config: AppwriteConfig;
   bucketId: string;
@@ -25,6 +30,7 @@ export async function downloadStorageFile(input: {
   return downloadAppwriteResource({ config: input.config, url, outputPath: input.outputPath });
 }
 
+/** Descarga el código fuente o los outputs de un deployment de una función de Appwrite. */
 export async function downloadFunctionDeployment(input: {
   config: AppwriteConfig;
   functionId: string;

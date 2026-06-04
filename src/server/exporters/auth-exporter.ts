@@ -4,6 +4,7 @@ import { listAll, paginateRows } from "../utils/pagination";
 import { isObject, omitSensitiveFields } from "./sanitize";
 import type { JsonObject, ModuleExportResult } from "./types";
 
+/** Exporta usuarios, equipos, membresías y targets de Auth, redactando campos sensibles como contraseñas e hashes. */
 export async function exportAuth(services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("auth");
 

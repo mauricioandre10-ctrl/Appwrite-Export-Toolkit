@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+/** Preset de programación cron que representa un patrón de ejecución conocido o una expresión personalizada. */
 export type CronPreset =
   | { kind: "every-minute" }
   | { kind: "every-n-minutes"; n: number }
@@ -102,6 +103,7 @@ type Props = {
   onChange: (expression: string) => void;
 };
 
+/** Selector interactivo de programación cron con presets predefinidos y modo personalizado. */
 export function ScheduleCronInput({ value, onChange }: Props) {
   const [preset, setPreset] = useState<CronPreset>(() => buildInitialPreset(value));
   const [customExpr, setCustomExpr] = useState<string>(value);

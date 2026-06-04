@@ -1,14 +1,21 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+/** Mapeo de un ID de origen a su equivalente en el destino, usado durante la importación. */
 export type IdMapping = {
+  /** ID del recurso en el servidor de origen. */
   source: string;
+  /** ID del recurso en el servidor de destino (asignado tras la creación). */
   destination: string;
+  /** Tipo de recurso al que pertenece el mapeo. */
   type: "user" | "team" | "database" | "collection" | "bucket" | "function" | "topic" | "document" | "provider";
 };
 
+/** Almacén serializable de todos los mapeos de IDs generados durante una importación. */
 export type IdRemapStore = {
+  /** Lista de todos los mapeos de IDs. */
   mappings: IdMapping[];
+  /** Timestamp ISO 8601 de cuándo se creó el almacén. */
   createdAt: string;
 };
 

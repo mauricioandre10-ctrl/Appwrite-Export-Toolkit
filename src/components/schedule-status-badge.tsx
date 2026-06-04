@@ -33,6 +33,7 @@ function label(status: Status): string {
   }
 }
 
+/** Badge visual que muestra el estado de una ejecución (éxito, error, en curso o desconocido). */
 export function ScheduleStatusBadge({ status, className = "" }: Props) {
   const normalized: Status =
     status === "success" || status === "failed" || status === "running" ? status : "unknown";

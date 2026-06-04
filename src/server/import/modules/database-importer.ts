@@ -41,6 +41,19 @@ function buildCollectionIndex(schemaDb: SchemaDatabase | undefined): Map<string,
   return map;
 }
 
+/**
+ * Importa todas las bases de datos, colecciones y documentos desde un backup.
+ *
+ * Recorre el directorio `databases/` del backup, crea las bases de datos y
+ * colecciones que no existan, restaura esquemas (atributos e índices) y
+ * finalmente importa los documentos archivo por archivo.
+ *
+ * @param services - Cliente de Appwrite con los servicios disponibles (databases, etc.).
+ * @param backupRoot - Ruta raíz del directorio de backup.
+ * @param remapper - Instancia de IdRemapper para traducir IDs originales a IDs destino.
+ * @param log - Logger opcional de pino. Si no se provee se usa un logger silencioso.
+ * @returns Un {@link ImportModuleResult} con el resumen de la importación (creados, omitidos, errores).
+ */
 export async function importDatabases(
   services: AppwriteServices,
   backupRoot: string,

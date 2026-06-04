@@ -29,6 +29,7 @@ function getPhaseInfo(phase: string): PhaseInfo {
   return PHASE_LABELS[phase] ?? { label: phase, emoji: "⏳" };
 }
 
+/** Panel principal para lanzar exports de módulos con progreso en tiempo real vía SSE. */
 export function ExportPanel({ configError }: { configError: string | null }) {
   const modules = ["all", "auth", "databases", "storage"];
   const [loading, setLoading] = useState(false);

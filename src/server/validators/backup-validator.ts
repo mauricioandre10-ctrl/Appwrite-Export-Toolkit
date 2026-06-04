@@ -4,19 +4,30 @@ import path from "node:path";
 import { sha256File } from "../backup/checksum-service";
 import type { BackupManifest } from "../types/backup";
 
+/** Nivel de severidad de un problema de validación encontrado en el backup. */
 export type ValidationSeverity = "error" | "warning";
 
+/** Problema individual encontrado durante la validación de un backup. */
 export type ValidationIssue = {
+  /** Severidad del problema: "error" para fallos críticos, "warning" para observaciones. */
   severity: ValidationSeverity;
+  /** Código identificador del problema (e.g. "checksum.mismatch"). */
   code: string;
+  /** Descripción legible del problema. */
   message: string;
+  /** Ruta relativa al archivo o recurso involucrado, si aplica. */
   path?: string;
 };
 
+/** Resultado completo de la validación de un backup. */
 export type BackupValidationResult = {
+  /** `true` si no se encontraron errores (los warnings no afectan). */
   ok: boolean;
+  /** Ruta absoluta a la raíz del backup validado. */
   backupRoot: string;
+  /** Timestamp ISO 8601 de cuándo se ejecutó la validación. */
   checkedAt: string;
+  /** Conteos resumen de lo que se revisó. */
   counts: {
     errors: number;
     warnings: number;
@@ -25,6 +36,7 @@ export type BackupValidationResult = {
     storageFiles: number;
     databaseDocuments: number;
   };
+  /** Lista de todos los problemas encontrados durante la validación. */
   issues: ValidationIssue[];
 };
 
@@ -40,6 +52,16 @@ type BackupContext = {
   databaseDocumentCount: number;
 };
 
+/**
+ * Valida la integridad completa de un backup exportado por Appwrite.
+ *
+ * Revisa el manifest, la existencia de archivos, checksums, auth, storage,
+ * databases, el orden de restauración y los estados de los módulos.
+ *
+ * @param backupRootInput - Ruta (absoluta o relativa) al directorio raíz del backup.
+ * @returns Objeto con el resultado de la validación, incluyendo errores, warnings y conteos.
+ * @throws No lanza excepciones directamente; los errores de archivo se registran como issues en el resultado.
+ */
 export async function validateBackup(backupRootInput: string): Promise<BackupValidationResult> {
   const root = path.resolve(/* turbopackIgnore: true */ backupRootInput);
   const issues: ValidationIssue[] = [];
@@ -84,6 +106,15 @@ export async function validateBackup(backupRootInput: string): Promise<BackupVal
   };
 }
 
+/**
+ * Extrae los IDs de usuario únicos de un array de permisos de Appwrite.
+ *
+ * Busca patrones del tipo "user:<userId>" en cada string del array y devuelve
+ * los IDs encontrados sin duplicados.
+ *
+ * @param permissions - Array de strings de permisos (e.g. `["user:abc123", "team:def456/true"]`).
+ * @returns Array con los IDs de usuario únicos extraídos de los permisos.
+ */
 export function extractUserIdsFromPermissions(permissions: readonly unknown[]): string[] {
   const userIds = new Set<string>();
   const userPermissionPattern = /user:([^"\)]+)/g;
@@ -104,6 +135,16 @@ export function extractUserIdsFromPermissions(permissions: readonly unknown[]): 
   return [...userIds];
 }
 
+/**
+ * Busca referencias a archivos de Storage dentro de un valor anidado.
+ *
+ * Recorre el objeto de forma recursiva buscando claves que parezcan
+ * referencias a archivos (photo, avatar, fileId, etc.) y extrae los IDs.
+ *
+ * @param value - Objeto o valor a inspeccionar (puede ser un documento, array, etc.).
+ * @param sourcePath - Ruta JSON descriptiva del origen del valor, para los issues.
+ * @returns Array de objetos con la ruta del campo y el fileId detectado.
+ */
 export function findLikelyFileReferences(value: unknown, sourcePath: string): Array<{ path: string; fileId: string }> {
   const refs: Array<{ path: string; fileId: string }> = [];
   visitLikelyFileReferences(value, sourcePath, refs);
@@ -380,6 +421,13 @@ function validateModuleStatus(context: BackupContext, manifest: BackupManifest):
   }
 }
 
+// Recorrido DFS de un objeto JSON arbitrario para detectar referencias
+// a archivos de Storage. La idea es que los documentos de Appwrite
+// pueden tener campos como "photo", "avatar", "fileId" que contienen
+// IDs de archivos almacenados en Storage. Este visitor recorre arrays
+// y objetos anidados, y cuando encuentra una clave que parece una
+// referencia a archivo (según isLikelyFileReferenceKey), extrae el ID.
+// Si la clave no es candidata, sigue recursivamente hacia adentro.
 function visitLikelyFileReferences(value: unknown, currentPath: string, refs: Array<{ path: string; fileId: string }>): void {
   if (Array.isArray(value)) {
     value.forEach((item, index) => visitLikelyFileReferences(item, `${currentPath}[${index}]`, refs));
@@ -393,6 +441,8 @@ function visitLikelyFileReferences(value: unknown, currentPath: string, refs: Ar
   for (const [key, nestedValue] of Object.entries(value)) {
     const nestedPath = `${currentPath}.${key}`;
 
+    // Si la clave parece una referencia a archivo, extraemos los IDs
+    // en lugar de seguir recursivamente (podría causar falsos positivos).
     if (isLikelyFileReferenceKey(key)) {
       for (const fileId of normalizeFileReferenceValues(nestedValue)) {
         refs.push({ path: nestedPath, fileId });

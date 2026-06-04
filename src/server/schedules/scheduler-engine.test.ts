@@ -1,3 +1,7 @@
+/**
+ * Tests para el scheduler-engine — verifica el registro y desregistro de schedules,
+ * el cálculo de la próxima ejecución y la validación de expresiones cron inválidas.
+ */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";

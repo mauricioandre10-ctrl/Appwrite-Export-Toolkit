@@ -1,4 +1,10 @@
 #!/usr/bin/env node
+/**
+ * CLI principal del toolkit de exportación de Appwrite.
+ *
+ * Ofrece comandos para inspeccionar, exportar, validar, importar y
+ * eliminar backups de un proyecto Appwrite.
+ */
 import { Command } from "commander";
 
 import { createAppwriteServices } from "@/server/appwrite/client";

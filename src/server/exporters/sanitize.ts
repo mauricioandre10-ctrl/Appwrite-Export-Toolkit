@@ -11,6 +11,7 @@ const sensitiveKeys = new Set([
   "certificate",
 ]);
 
+/** Recorre un objeto y reemplaza los campos sensibles (password, hash, privateKey, etc.) por "[redacted]". */
 export function omitSensitiveFields(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => omitSensitiveFields(item));
@@ -34,6 +35,7 @@ export function omitSensitiveFields(value: unknown): unknown {
   return output;
 }
 
+/** Type guard que verifica si un valor es un objeto JSON (no null ni array). */
 export function isObject(value: unknown): value is JsonObject {
   return typeof value === "object" && value !== null;
 }

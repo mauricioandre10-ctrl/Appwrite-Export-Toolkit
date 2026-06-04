@@ -1,3 +1,8 @@
+/**
+ * Configuración de ESLint para el proyecto.
+ * Extiende las reglas de Next.js (core web vitals + TypeScript) y
+ * define ignores globales para carpetas de build y generadas.
+ */
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";

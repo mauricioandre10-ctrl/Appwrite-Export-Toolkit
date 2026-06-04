@@ -3,6 +3,7 @@ import type { BackupWriter } from "../backup/backup-writer";
 import { listAll, paginateRows } from "../utils/pagination";
 import type { ModuleExportResult } from "./types";
 
+/** Exporta bases de datos, colecciones, atributos, índices y documentos de Appwrite. */
 export async function exportDatabases(services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("databases");
 

@@ -8,6 +8,7 @@ type Props = {
   backupId: string;
 };
 
+/** Badge que muestra el número de warnings de un backup y un modal con los detalles. */
 export function BackupWarnings({ count, messages, backupId }: Props) {
   const [open, setOpen] = useState(false);
 

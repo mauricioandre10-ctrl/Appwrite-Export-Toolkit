@@ -11,6 +11,7 @@ function isManual(trigger: Trigger | string | undefined): boolean {
   return trigger === "manual";
 }
 
+/** Badge que indica si una ejecución fue disparada manualmente o por cron automáticamente. */
 export function TriggerBadge({ trigger, className = "" }: Props) {
   const manual = isManual(trigger);
 

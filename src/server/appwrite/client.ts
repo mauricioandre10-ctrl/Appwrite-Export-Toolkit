@@ -2,6 +2,7 @@ import { Client, Databases, Functions, Messaging, Storage, Teams, Users } from "
 
 import type { AppwriteConfig } from "./config";
 
+/** Servicios del SDK de Appwrite inicializados con las credenciales de configuración. */
 export type AppwriteServices = {
   client: Client;
   databases: Databases;
@@ -12,6 +13,7 @@ export type AppwriteServices = {
   users: Users;
 };
 
+/** Crea y devuelve una instancia de cada servicio del SDK de Appwrite listos para usar. */
 export function createAppwriteServices(config: AppwriteConfig): AppwriteServices {
   const client = new Client()
     .setEndpoint(config.APPWRITE_ENDPOINT)

@@ -11,16 +11,31 @@ import { updateJob } from "./progress-store";
 
 const log = pino({ level: "info" });
 
+/**
+ * Tipo que define la selección de módulos para importar.
+ * Contiene la lista de módulos que se van a restaurar desde el backup.
+ */
 export type ImportSelection = {
+  /** Lista de nombres de módulos a importar */
   modules: string[];
 };
 
+/**
+ * Tipo que representa el resultado completo de una importación de backup.
+ * Contiene información sobre los módulos importados y el estado general de la operación.
+ */
 export type ImportResult = {
+  /** ID del backup que se está importando */
   backupId: string;
+  /** Endpoint de Appwrite destino de la importación */
   targetEndpoint: string;
+  /** Resultados individuales de cada módulo importado */
   modules: ImportModuleResult[];
+  /** Estado general de la importación */
   status: "complete" | "partial" | "failed";
+  /** Fecha y hora de inicio de la importación */
   startedAt: string;
+  /** Fecha y hora de finalización de la importación */
   finishedAt: string;
 };
 
@@ -32,6 +47,13 @@ const MODULE_WEIGHTS: Record<string, number> = {
   storage: 20,
 };
 
+/**
+ * Parsea y valida una selección de importación desde un string.
+ * Convierte el valor a un ImportSelection válido, filtrando módulos no soportados.
+ *
+ * @param input - String con la selección de módulos (puede ser "all" o lista separada por comas)
+ * @returns La selección validada de importación con los módulos a restaurar
+ */
 export function parseImportSelection(input: string): ImportSelection {
   if (input === "all") {
     return { modules: [...RESTORE_ORDER] };
@@ -59,6 +81,19 @@ function computePercent(modules: string[], completedIndex: number): number {
   return Math.round((completedWeight / weightSum) * 100);
 }
 
+/**
+ * Orquesta el proceso completo de importación de backup hacia Appwrite.
+ * Restaura los módulos seleccionados desde un backup existente, manejando el remapeo de IDs.
+ *
+ * @param input - Objeto con los parámetros de configuración para la importación
+ * @param input.selection - Selección de módulos a importar
+ * @param input.config - Configuración de conexión con Appwrite destino
+ * @param input.services - Servicios configurados de Appwrite para realizar las llamadas API
+ * @param input.backupPath - Ruta del backup a importar
+ * @param input.jobId - ID opcional del job para seguimiento de progreso
+ * @param input.onProgress - Callback opcional para reportar progreso de la importación
+ * @returns Resultado completo de la importación realizada con estadísticas por módulo
+ */
 export async function importBackup(input: {
   selection: ImportSelection;
   config: AppwriteConfig;

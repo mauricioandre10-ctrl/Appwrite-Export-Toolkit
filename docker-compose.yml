@@ -1,3 +1,5 @@
+# Docker Compose para el toolkit de exportación de Appwrite.
+# Levanta la app en el puerto 3000 y monta un volumen persistente para backups.
 services:
   appwrite-export-toolkit:
     build:

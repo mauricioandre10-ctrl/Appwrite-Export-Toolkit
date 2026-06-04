@@ -6,6 +6,7 @@ import { getJob } from "@/server/import/progress-store";
 
 export const dynamic = "force-dynamic";
 
+/** Devuelve el estado actual de un job de importación. */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ jobId: string }> },

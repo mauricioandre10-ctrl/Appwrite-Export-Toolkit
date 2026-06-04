@@ -12,19 +12,31 @@ import { clearCurrentJob, setCurrentJob } from "./running-jobs";
 import { appendRun, getSchedule } from "./storage";
 import type { Schedule, ScheduleRun, ScheduleRunTrigger } from "./types";
 
+/**
+ * Tipo que representa el resultado de ejecutar un export programado.
+ * Contiene información sobre el éxito de la operación, el job creado y un resumen opcional.
+ */
 export type ScheduleRunResult = {
+  /** Indica si la ejecución fue exitosa */
   success: boolean;
+  /** ID del job creado para esta ejecución */
   jobId: string;
+  /** Tipo de trigger que inició la ejecución (programado o manual) */
   trigger: ScheduleRunTrigger;
+  /** Mensaje de error si la ejecución falló */
   errorMessage?: string;
+  /** Resumen de la exportación si fue exitosa */
   summary?: BackupExportSummary;
 };
 
+/**
+ * Tipo que define las opciones adicionales para ejecutar un export programado.
+ */
 export type RunOptions = {
   /**
-   * If provided, the runner will not allocate a new jobId; it uses this one and skips
-   * the initial history placeholder write (caller already wrote it). Useful when the
-   * caller wants to surface the jobId to the client immediately before the run starts.
+   * Si se proporciona, el runner no asignará un nuevo jobId; usará este y saltará
+   * la escritura inicial del placeholder en el historial (el caller ya lo escribió).
+   * Útil cuando el caller quiere mostrar el jobId al cliente inmediatamente antes de que inicie la ejecución.
    */
   preAllocatedJobId?: string;
 };
@@ -67,6 +79,15 @@ function buildFinalRun(
   return run;
 }
 
+/**
+ * Ejecuta un export programado o manual de Appwrite.
+ * Maneja todo el ciclo de vida: creación del job, exportación, registro en historial y limpieza.
+ *
+ * @param schedule - Configuración del schedule a ejecutar con sus parámetros
+ * @param trigger - Tipo de trigger que inicia la ejecución (por defecto "scheduled")
+ * @param options - Opciones adicionales como jobId pre-asignado
+ * @returns Resultado de la ejecución con información del job y resumen de la exportación
+ */
 export async function runScheduledExport(
   schedule: Schedule,
   trigger: ScheduleRunTrigger = "scheduled",

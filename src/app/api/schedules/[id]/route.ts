@@ -11,6 +11,7 @@ import { logger } from "@/server/utils/logger";
 
 export const dynamic = "force-dynamic";
 
+/** Valida una expresión cron devolviendo null si es válida o el mensaje de error si no lo es. */
 function validateCron(expression: string, timezone: string): string | null {
   try {
     new Cron(expression, { timezone });
@@ -22,6 +23,7 @@ function validateCron(expression: string, timezone: string): string | null {
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+/** Actualiza los campos de un schedule existente (cron, timezone, nombre, módulo, etc.). */
 export async function PATCH(request: Request, context: RouteContext): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;
@@ -83,6 +85,7 @@ export async function PATCH(request: Request, context: RouteContext): Promise<Ne
   return NextResponse.json({ schedule: updated });
 }
 
+/** Elimina un schedule y lo desregistra del motor de cron. */
 export async function DELETE(request: Request, context: RouteContext): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;
@@ -111,6 +114,7 @@ export async function DELETE(request: Request, context: RouteContext): Promise<N
   return NextResponse.json({ success: true });
 }
 
+/** POST no-op; redirige al cliente a usar POST /api/schedules/[id]/run. */
 export async function POST(_request: Request, context: RouteContext): Promise<NextResponse> {
   // POST on a single schedule is a no-op; exists to avoid 404 when client retries.
   const { id } = await context.params;

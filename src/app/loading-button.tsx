@@ -2,6 +2,7 @@
 
 import { useFormStatus } from "react-dom";
 
+/** Botón de envío con spinner y feedback de progreso durante export/import. */
 export function LoadingSubmitButton({
   label,
   module: moduleName,
@@ -32,6 +33,7 @@ export function LoadingSubmitButton({
   );
 }
 
+/** Botón de login que se deshabilita mientras la configuración no esté lista o el formulario esté procesando. */
 export function LoginSubmitButton({ configReady }: { configReady: boolean }) {
   const { pending } = useFormStatus();
 

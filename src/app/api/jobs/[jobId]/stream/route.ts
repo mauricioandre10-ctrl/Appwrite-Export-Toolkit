@@ -7,6 +7,7 @@ import { streamJob } from "@/server/jobs/job-streamer";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+/** Devuelve un stream SSE con los eventos de progreso de un job de importación. */
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ jobId: string }> },

@@ -1,5 +1,6 @@
 "use client";
 
+/** Campo hidden para enviar el token CSRF en formularios. */
 export function CsrfTokenInput({ token }: { token?: string | null | undefined }) {
   if (!token) {
     return null;

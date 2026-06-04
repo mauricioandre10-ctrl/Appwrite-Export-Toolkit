@@ -17,6 +17,7 @@ type JobProgress = {
   error?: string | undefined;
 };
 
+/** Contenedor de barra de progreso que realiza polling del estado de un job y redirige al completarse. */
 export function JobProgressContainer({ jobId }: { jobId: string }) {
   const router = useRouter();
 

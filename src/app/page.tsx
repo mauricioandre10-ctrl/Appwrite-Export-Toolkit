@@ -18,6 +18,7 @@ import { CsrfTokenInput } from "./csrf-token";
 import { sessionCookieName, getLoginConfig, createSessionToken, safeEqual, isValidSessionToken } from "@/server/auth/session";
 import { validateCsrfToken, getCsrfToken } from "@/server/auth/csrf";
 
+/** Limpia mensajes de error para evitar filtrar paths del sistema al usuario. */
 function sanitizeErrorMessage(error: unknown, fallback: string): string {
   if (!(error instanceof Error)) {
     return fallback;
@@ -29,6 +30,7 @@ function sanitizeErrorMessage(error: unknown, fallback: string): string {
   return msg.slice(0, 80).replaceAll(" ", "_");
 }
 
+/** Valida el token CSRF del form y redirige si es invalido. */
 async function requireCsrf(formData: FormData): Promise<void> {
   const token = formData.get("csrf_token");
   if (!(await validateCsrfToken(typeof token === "string" ? token : null))) {
@@ -55,6 +57,7 @@ type PageProps = {
   }>;
 };
 
+/** Pagina principal: muestra login si no autenticado, o el dashboard completo. */
 export default async function Home({ searchParams }: PageProps) {
   const loginConfig = getLoginConfig();
   const cookieStore = await cookies();
@@ -106,6 +109,7 @@ export default async function Home({ searchParams }: PageProps) {
   );
 }
 
+/** Shell principal del dashboard autenticado con tabs, alertas y contenido dinamico. */
 function DashboardShell({
   backups,
   outputDir,
@@ -169,6 +173,7 @@ function DashboardShell({
   );
 }
 
+/** Barra de navegacion por tabs: Export, Schedules e Import. */
 function AppBar({ activeTab }: { activeTab: "export" | "import" | "schedules" }) {
   return (
     <nav className="mt-5 flex gap-1 rounded-2xl border border-white/10 bg-white/[0.04] p-1">
@@ -212,10 +217,12 @@ function AppBar({ activeTab }: { activeTab: "export" | "import" | "schedules" })
   );
 }
 
+/** Wrapper del panel de programacion de backups. */
 function SchedulesSection() {
   return <SchedulesPanel />;
 }
 
+/** Seccion de exportacion: metricas del ultimo backup, panel de export y historial. */
 function ExportSection({
   backups,
   latest,
@@ -273,6 +280,7 @@ function ExportSection({
   );
 }
 
+/** Seccion de importacion: panel de restauracion y resultado del import. */
 function ImportSection({
   backups,
   configError,
@@ -318,6 +326,7 @@ function ImportSection({
   );
 }
 
+/** Muestra el resultado de un import con tono segun el estado (success, partial, failed). */
 function ImportResultAlert({ params }: { params: Awaited<PageProps["searchParams"]> }) {
   const status = params?.importStatus ?? "complete";
   const tone = status === "failed" ? "error" : status === "partial" ? "warning" : "success";
@@ -336,6 +345,7 @@ function ImportResultAlert({ params }: { params: Awaited<PageProps["searchParams
   );
 }
 
+/** Panel de alertas contextual: errores de config, export completado, validacion, etc. */
 function AlertPanel({
   params,
   configError,
@@ -374,6 +384,7 @@ function AlertPanel({
   return null;
 }
 
+/** Tarjeta del ultimo backup: metricas por modulo, logs recientes y acciones de validacion/descarga. */
 function LatestBackupCard({ backup, csrfToken }: { backup: BackupSummary | undefined; csrfToken?: string | null | undefined }) {
   if (backup === undefined) {
     return (
@@ -446,6 +457,7 @@ function LatestBackupCard({ backup, csrfToken }: { backup: BackupSummary | undef
   );
 }
 
+/** Lista historial de backups con acciones de descargar, validar y eliminar por cada uno. */
 function BackupHistory({ backups, csrfToken }: { backups: BackupSummary[]; csrfToken?: string | null | undefined }) {
   return (
     <div className="rounded-[2rem] border border-white/10 bg-slate-950/50 p-6">
@@ -511,6 +523,7 @@ function BackupHistory({ backups, csrfToken }: { backups: BackupSummary[]; csrfT
   );
 }
 
+/** Panel de login con campos de usuario/password y mensajes de estado. */
 function LoginPanel({
   action,
   configReady,
@@ -555,6 +568,7 @@ function LoginPanel({
   );
 }
 
+/** Chip pequeno con texto clickeable para mostrar metricas compactas. */
 function MiniChip({ label, onClick }: { label: string; onClick?: () => void }) {
   return (
     <span 
@@ -566,6 +580,7 @@ function MiniChip({ label, onClick }: { label: string; onClick?: () => void }) {
   );
 }
 
+/** Barra de progreso simple con color dinamico segun el porcentaje. */
 function SimpleProgressBar({ percent, size = "md" }: { percent: number; size?: "sm" | "md" }) {
   const clamped = Math.max(0, Math.min(100, percent));
   const height = size === "sm" ? "h-1.5" : "h-3";
@@ -593,6 +608,7 @@ function SimpleProgressBar({ percent, size = "md" }: { percent: number; size?: "
   );
 }
 
+/** Fila de log individual con timestamp, nivel de severidad y mensaje. */
 function LogEntryRow({ entry }: { entry: import("@/server/backups/catalog").BackupLogEntry }) {
   const levelStyle =
     entry.level === "ERROR"
@@ -610,6 +626,7 @@ function LogEntryRow({ entry }: { entry: import("@/server/backups/catalog").Back
   );
 }
 
+/** Icono SVG de exportacion (flecha hacia arriba). */
 function ExportIcon() {
   return (
     <svg className="size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -618,6 +635,7 @@ function ExportIcon() {
   );
 }
 
+/** Icono SVG de importacion (flecha hacia abajo). */
 function ImportIcon() {
   return (
     <svg className="size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -626,6 +644,7 @@ function ImportIcon() {
   );
 }
 
+/** Icono SVG de reloj para programacion de backups. */
 function ScheduleIcon() {
   return (
     <svg className="size-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -635,6 +654,7 @@ function ScheduleIcon() {
   );
 }
 
+/** Icono SVG de descarga. */
 function DownloadIcon() {
   return (
     <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -643,6 +663,7 @@ function DownloadIcon() {
   );
 }
 
+/** Icono SVG de papelera para eliminar. */
 function TrashIcon() {
   return (
     <svg className="size-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -651,6 +672,7 @@ function TrashIcon() {
   );
 }
 
+/** Boton de envio generico con icono opcional y variante compacta. */
 function SubmitButton({ label, icon, compact }: { label: string; icon?: "check" | "download"; compact?: boolean }) {
   return (
     <button
@@ -668,6 +690,7 @@ function SubmitButton({ label, icon, compact }: { label: string; icon?: "check" 
   );
 }
 
+/** Formatea un timestamp ISO a hora legible en formato 24h. */
 function formatLogTimestamp(timestamp: string): string {
   try {
     const date = new Date(timestamp);
@@ -685,12 +708,14 @@ function formatLogTimestamp(timestamp: string): string {
   }
 }
 
+/** Glow decorativo de fondo con gradientes radiales. */
 function BackgroundGlow() {
   return (
     <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,#23d3a640,transparent_34%),radial-gradient(circle_at_bottom_right,#4f46e540,transparent_34%)]" />
   );
 }
 
+/** Header de marca con logo y nombre del toolkit, en variante compacta o completa. */
 function BrandHeader({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-3 sm:gap-4">
@@ -713,6 +738,7 @@ function BrandHeader({ compact = false }: { compact?: boolean }) {
   );
 }
 
+/** Copy principal de la landing: titulo, subtitulo e imagen del hero. */
 function HeroCopy() {
   return (
     <div className="max-w-2xl">
@@ -734,6 +760,7 @@ function HeroCopy() {
   );
 }
 
+/** Tarjeta de metrica individual con tono de color configurable. */
 function DashboardMetric({ label, value, tone }: { label: string; value: string; tone: string }) {
   const toneClass = {
     emerald: "border-emerald-300/20 bg-emerald-300/10 text-emerald-100",
@@ -753,6 +780,7 @@ function DashboardMetric({ label, value, tone }: { label: string; value: string;
   );
 }
 
+/** Pill indicador de estado del export (completo o parcial). */
 function StatusPill({ status }: { status: "complete" | "partial" }) {
   return (
     <div className={`rounded-full px-4 py-2 text-sm font-bold ${status === "complete" ? "bg-emerald-300 text-slate-950" : "bg-amber-300 text-slate-950"}`}>
@@ -761,6 +789,7 @@ function StatusPill({ status }: { status: "complete" | "partial" }) {
   );
 }
 
+/** Alerta de panel con titulo y mensaje, en tono success o error. */
 function PanelAlert({ tone, title, message }: { tone: "success" | "error"; title: string; message: string }) {
   const toneClass = tone === "success" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-red-300/20 bg-red-300/10 text-red-100";
 
@@ -772,6 +801,7 @@ function PanelAlert({ tone, title, message }: { tone: "success" | "error"; title
   );
 }
 
+/** Notificacion inline con tono success, warning o error. */
 function InlineNotice({ tone, message }: { tone: "success" | "warning" | "error"; message: string }) {
   const toneClass = {
     success: "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
@@ -782,6 +812,7 @@ function InlineNotice({ tone, message }: { tone: "success" | "warning" | "error"
   return <div className={`mt-6 rounded-2xl border p-4 text-sm ${toneClass}`}>{message}</div>;
 }
 
+/** Modal de confirmacion de eliminacion de backup con info detallada y acciones. */
 async function DeleteConfirmModal({ backupId, csrfToken }: { backupId: string; csrfToken?: string | null | undefined }) {
   let info;
   try {
@@ -858,6 +889,7 @@ async function DeleteConfirmModal({ backupId, csrfToken }: { backupId: string; c
   );
 }
 
+/** Formatea una fecha ISO a formato local en espanol. */
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("es", {
     dateStyle: "medium",
@@ -865,6 +897,7 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
+/** Obtiene los datos del dashboard: lista de backups, directorio y errores de config. */
 async function getDashboardData(): Promise<{
   backups: BackupSummary[];
   outputDir: string;
@@ -887,6 +920,7 @@ async function getDashboardData(): Promise<{
   }
 }
 
+/** Server action: ejecuta validacion de integridad sobre un backup y redirige con resultado. */
 async function validateAction(formData: FormData) {
   "use server";
 
@@ -913,6 +947,7 @@ async function validateAction(formData: FormData) {
   );
 }
 
+/** Server action: redirige al modal de confirmacion de eliminacion. */
 async function deleteConfirmAction(formData: FormData) {
   "use server";
 
@@ -923,6 +958,7 @@ async function deleteConfirmAction(formData: FormData) {
   redirect(`/?deleteConfirm=${encodeURIComponent(backupId)}`);
 }
 
+/** Server action: elimina un backup del disco y redirige con confirmacion. */
 async function deleteAction(formData: FormData) {
   "use server";
 
@@ -942,6 +978,7 @@ async function deleteAction(formData: FormData) {
   redirect(`/?deleted=${encodeURIComponent(backupId)}`);
 }
 
+/** Server action: autentica al usuario y crea la cookie de sesion. */
 async function loginAction(formData: FormData) {
   "use server";
 
@@ -967,6 +1004,7 @@ async function loginAction(formData: FormData) {
   redirect("/");
 }
 
+/** Server action: cierra la sesion eliminando la cookie y redirige al login. */
 async function logoutAction(formData: FormData) {
   "use server";
 
@@ -977,6 +1015,7 @@ async function logoutAction(formData: FormData) {
   redirect("/?loggedOut=1");
 }
 
+/** Verifica que haya una sesion activa, redirige al login si no la hay. */
 async function requireAuthenticated(): Promise<void> {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get(sessionCookieName)?.value;
@@ -986,6 +1025,7 @@ async function requireAuthenticated(): Promise<void> {
   }
 }
 
+/** Footer de la app con info de licencia y autor. */
 function Footer() {
   return (
     <footer className="mt-auto border-t border-white/10 pt-6 pb-4">

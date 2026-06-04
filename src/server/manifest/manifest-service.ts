@@ -1,5 +1,8 @@
 import type { BackupManifest } from "../types/backup";
 
+/**
+ * Crea un manifiesto vacío con los metadatos básicos del backup (proyecto, endpoint, versión de formato).
+ */
 export function createInitialManifest(input: {
   formatVersion: string;
   endpoint: string;

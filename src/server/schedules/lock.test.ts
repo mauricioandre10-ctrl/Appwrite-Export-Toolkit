@@ -1,3 +1,8 @@
+/**
+ * Tests para el módulo de locks de schedules — valida la adquisición,
+ * liberación y aislamiento de locks basados en archivos para evitar
+ * ejecuciones concurrentes del mismo schedule.
+ */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";

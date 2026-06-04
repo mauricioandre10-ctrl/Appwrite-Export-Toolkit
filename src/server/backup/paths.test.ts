@@ -1,3 +1,7 @@
+/**
+ * Tests para createBackupId — valida la generación de IDs de backup
+ * con formato seguro para filesystem, incluyendo timestamp, módulo y project ID.
+ */
 import { describe, expect, it } from "vitest";
 
 import { createBackupId } from "./paths";

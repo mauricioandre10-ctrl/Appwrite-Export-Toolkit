@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ScheduleStatusBadge } from "./schedule-status-badge";
 import { TriggerBadge } from "./trigger-badge";
 
+/** Vista de un schedule programado, incluyendo estado, historial y datos de ejecución en vivo. */
 export type ScheduleViewModel = {
   id: string;
   name: string;
@@ -187,6 +188,7 @@ function LiveProgressReader({
   return null;
 }
 
+/** Tarjeta visual de un schedule con toggle, acciones, progreso en vivo y historial de ejecuciones. */
 export function ScheduleCard({ schedule, onToggle, onEdit, onDelete, onRun, busy, toggling }: Props) {
   const mod = MODULE_LABELS[schedule.module] ?? { label: schedule.module, emoji: "📦" };
   const isRunning = schedule.lastRunStatus === "running";

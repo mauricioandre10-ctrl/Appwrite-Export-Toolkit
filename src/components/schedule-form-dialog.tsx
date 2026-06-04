@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { ScheduleCronInput } from "./schedule-cron-input";
 
+/** Valores del formulario para crear o editar un schedule de backups. */
 export type ScheduleFormValues = {
   name: string;
   cronExpression: string;
@@ -64,6 +65,7 @@ const DEFAULTS: ScheduleFormValues = {
   enabled: true,
 };
 
+/** Diálogo modal con formulario para crear o editar un schedule programado. */
 export function ScheduleFormDialog({ open, initial, onClose, onSubmit, mode }: Props) {
   const [values, setValues] = useState<ScheduleFormValues>(initial ?? DEFAULTS);
   const [submitting, setSubmitting] = useState(false);

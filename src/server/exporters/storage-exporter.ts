@@ -31,6 +31,7 @@ function extForMime(mimeType: string | undefined): string {
   return MIME_TO_EXT[mimeType] ?? `.${mimeType.split("/").pop() ?? "bin"}`;
 }
 
+/** Exporta buckets, archivos y blobs de Storage, descargando cada archivo y registrando su checksum. */
 export async function exportStorage(config: AppwriteConfig, services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("storage");
 

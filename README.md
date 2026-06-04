@@ -1,6 +1,39 @@
 # Appwrite Export Toolkit
 
+[![Licencia: GPLv3](https://img.shields.io/badge/Licencia-GPLv3-blue.svg)](LICENSE)
+[![Versión](https://img.shields.io/badge/Versión-0.1.0-green.svg)](package.json)
+[![Node](https://img.shields.io/badge/Node-20%2B-lightgreen.svg)](package.json)
+
 Herramienta de exportación estructuración, validación y restauración de backups lógicos para proyectos Appwrite self-hosted.
+
+## Arquitectura
+
+```
+┌─────────────────────────────────────────────────┐
+│              Panel Web (Next.js)                │
+│   Dashboard ─ Exportar ─ Programar ─ Importar   │
+└──────────┬──────────────┬──────────────┬────────┘
+           │              │              │
+┌──────────▼──────┐ ┌─────▼─────┐ ┌─────▼──────┐
+│  API Routes     │ │  CLI      │ │ Scheduler  │
+│  /api/export    │ │  inspect  │ │  (cron)    │
+│  /api/import    │ │  export   │ │            │
+│  /api/backups   │ │  validate │ │            │
+│  /api/schedules │ │  import   │ │            │
+│  /api/health    │ │  delete   │ │            │
+└──────────┬──────┘ └─────┬─────┘ └─────┬──────┘
+           │              │              │
+┌──────────▼──────────────▼──────────────▼────────┐
+│              Servidor (src/server/)             │
+│  Exporters ─ Importers ─ Validators ─ Backup    │
+└──────────────────────┬──────────────────────────┘
+                       │
+              ┌────────▼────────┐
+              │   Appwrite API  │
+              │  Auth / DB /    │
+              │  Storage        │
+              └─────────────────┘
+```
 
 ## ¿Qué hace esta aplicación?
 
@@ -213,6 +246,37 @@ npm run test          # Ejecutar tests con Vitest
 npm run build         # Build de Next.js
 npm run check         # Los tres anteriores combinados
 ```
+
+## Documentación
+
+La documentación detallada se encuentra en el directorio [`docs/`](docs/):
+
+| Documento | Descripción |
+|-----------|-------------|
+| [Arquitectura](docs/ARQUITECTURA.md) | Arquitectura general del sistema |
+| [Referencia API](docs/API_REFERENCE.md) | Documentación completa de la API |
+| [Referencia CLI](docs/CLI_REFERENCE.md) | Guía de uso de la línea de comandos |
+| [Formato de Backup](docs/FORMATO_BACKUP.md) | Estructura y formato de los archivos de backup |
+| [Programación](docs/PROGRAMACION.md) | Uso del programador de backups con cron |
+| [Seguridad](docs/SEGURIDAD.md) | Patrones y prácticas de seguridad |
+| [Desarrollo](docs/DESARROLLO.md) | Guía para contribuir al proyecto |
+| [Agregar Módulos](docs/AGREGAR_MODULOS.md) | Cómo extender la herramienta con nuevos módulos |
+
+## API
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/export` | Exportar módulos del proyecto (SSE) |
+| `POST` | `/api/import` | Importar un backup a un proyecto (SSE) |
+| `GET` | `/api/backups/[backupId]/download` | Descargar un backup como `.tar.gz` |
+| `GET` | `/api/schedules` | Listar todos los schedules configurados |
+| `POST` | `/api/schedules` | Crear un nuevo schedule |
+| `GET` | `/api/schedules/[id]` | Obtener detalles de un schedule |
+| `PUT` | `/api/schedules/[id]` | Actualizar un schedule |
+| `DELETE` | `/api/schedules/[id]` | Eliminar un schedule |
+| `POST` | `/api/schedules/[id]/run` | Ejecutar un schedule manualmente |
+| `GET` | `/api/jobs/[jobId]` | Consultar estado de un job en ejecución |
+| `GET` | `/api/health` | Health check del servidor |
 
 ## Licencia
 

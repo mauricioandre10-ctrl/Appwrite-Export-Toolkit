@@ -24,6 +24,14 @@ function computeNextRun(schedule: Schedule): string | undefined {
   }
 }
 
+// Flujo de cada tick del cron:
+// 1) Intentamos adquirir un lock por ID para evitar ejecuciones
+//    superpuestas (por ejemplo si un tick anterior aún no terminó).
+// 2) Si el lock se obtuvo, importamos dinámicamente schedule-runner
+//    y ejecutamos la exportación programada. El import es lazy para
+//    no cargar módulos innecesariamente al arrancar el servidor.
+// 3) En el finally, siempre liberamos el lock sin importar si hubo
+//    éxito o error, para que el próximo tick pueda ejecutarse.
 async function handleTick(schedule: Schedule): Promise<void> {
   if (!acquireLock(schedule.id)) {
     logger.info({ id: schedule.id, name: schedule.name }, "Schedule skipped (already running)");
@@ -67,6 +75,15 @@ function makeCron(schedule: Schedule): Cron {
   );
 }
 
+/**
+ * Registra un schedule en el motor de cron.
+ *
+ * Si ya existía un job con el mismo ID, se detiene primero. Calcula la
+ * próxima ejecución y la almacena para que pueda consultarse después.
+ *
+ * @param schedule - El schedule a registrar con su expresión cron y timezone.
+ * @returns `true` si se registró correctamente, `false` si la expresión cron es inválida.
+ */
 export function register(schedule: Schedule): boolean {
   if (jobs.has(schedule.id)) {
     unregister(schedule.id);
@@ -91,6 +108,15 @@ export function register(schedule: Schedule): boolean {
   }
 }
 
+/**
+ * Desregistra un schedule y detiene su job de cron asociado.
+ *
+ * Limpia el mapa interno de jobs y borra la fecha de próxima ejecución
+ * almacenada para ese ID.
+ *
+ * @param id - El identificador del schedule a desregistrar.
+ * @returns `true` si se encontró y detuvo el job, `false` si no existía.
+ */
 export function unregister(id: string): boolean {
   const cron = jobs.get(id);
   if (cron === undefined) return false;
@@ -101,10 +127,25 @@ export function unregister(id: string): boolean {
   return true;
 }
 
+/**
+ * Verifica si un schedule está registrado activamente en el motor.
+ *
+ * @param id - El identificador del schedule a consultar.
+ * @returns `true` si el schedule tiene un job de cron activo, `false` en caso contrario.
+ */
 export function isRegistered(id: string): boolean {
   return jobs.has(id);
 }
 
+/**
+ * Detiene todos los jobs activos y vuelve a cargar todos los schedules
+ * habilitados desde el storage.
+ *
+ * Es útil después de cambios manuales en la base de datos de schedules
+ * para sincronizar el estado del motor.
+ *
+ * @returns Un objeto con el total de schedules encontrados y cuántos se registraron exitosamente.
+ */
 export function reloadAll(): { total: number; registered: number } {
   jobs.forEach((cron, id) => {
     cron.stop();
@@ -121,14 +162,33 @@ export function reloadAll(): { total: number; registered: number } {
   return { total: all.length, registered };
 }
 
+/**
+ * Punto de entrada para inicializar el motor de schedules al arrancar el servidor.
+ *
+ * Simplemente ejecuta {@link reloadAll} para cargar todos los schedules habilitados.
+ */
 export function bootstrap(): void {
   reloadAll();
 }
 
+/**
+ * Calcula la próxima fecha de ejecución de un schedule según su expresión cron.
+ *
+ * @param schedule - El schedule cuyo próximo run se quiere calcular.
+ * @returns La fecha en formato ISO 8601 o `undefined` si no se pudo calcular.
+ */
 export function getNextRun(schedule: Schedule): string | undefined {
   return computeNextRun(schedule);
 }
 
+/**
+ * Actualiza el estado de un schedule después de que fue modificado externamente.
+ *
+ * Si el schedule ya no existe o está deshabilitado, lo desregistra.
+ * Si está habilitado, lo (re)registra para que los cambios surtan efecto.
+ *
+ * @param id - El identificador del schedule que fue actualizado.
+ */
 export function refreshAfterPatch(id: string): void {
   const schedule = getSchedule(id);
   if (schedule === null) {
@@ -142,6 +202,12 @@ export function refreshAfterPatch(id: string): void {
   }
 }
 
+/**
+ * Detiene todos los jobs de cron activos y limpia el mapa interno.
+ *
+ * Se llama durante el apagado ordenado del servidor para evitar
+ * ejecuciones pendientes.
+ */
 export function shutdown(): void {
   jobs.forEach((cron, id) => {
     cron.stop();
@@ -150,6 +216,13 @@ export function shutdown(): void {
   jobs.clear();
 }
 
+/**
+ * Lista todos los jobs de cron registrados con su estado de ejecución.
+ *
+ * Función de utilidad para debugging. No usar en producción.
+ *
+ * @returns Un array con el ID de cada schedule y si está ejecutándose actualmente.
+ */
 export function _debugList(): Array<{ id: string; isRunning: boolean }> {
   return Array.from(jobs.entries()).map(([id, cron]) => ({ id, isRunning: cron.isRunning() }));
 }

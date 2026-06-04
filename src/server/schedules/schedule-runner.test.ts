@@ -1,3 +1,8 @@
+/**
+ * Tests para el schedule-runner — valida la ejecución de exports programados.
+ * Cubre ejecuciones exitosas y fallidas, el registro en historial de schedules,
+ * el uso de jobId pre-asignados y la selección correcta de config (source vs target).
+ */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";

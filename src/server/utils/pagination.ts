@@ -2,10 +2,16 @@ import { Query } from "node-appwrite";
 
 import { withRetry } from "./retry";
 
+/**
+ * Tipo genérico que representa la respuesta paginada de una API de Appwrite (campo dinámico + total).
+ */
 export type AppwriteListResponse<TKey extends string, TItem> = {
   total: number;
 } & Record<TKey, TItem[]>;
 
+/**
+ * Recorre todas las páginas de una lista de Appwrite y devuelve todos los registros juntos en un solo array.
+ */
 export async function listAll<TKey extends string, TItem>(
   key: TKey,
   list: (queries: string[]) => Promise<AppwriteListResponse<TKey, TItem>>,
@@ -22,6 +28,9 @@ export async function listAll<TKey extends string, TItem>(
   return { total, rows };
 }
 
+/**
+ * Generador asíncrono que pagina una lista de Appwrite, devolviendo lotes de registros uno por uno.
+ */
 export async function* paginateRows<TKey extends string, TItem>(
   key: TKey,
   list: (queries: string[]) => Promise<AppwriteListResponse<TKey, TItem>>,

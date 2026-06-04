@@ -4,11 +4,13 @@ import { createAppwriteServices } from "../appwrite/client";
 import { loadAppwriteConfig, loadTargetConfig } from "../appwrite/config";
 import { completeJob, getJob, updateJob, type JobProgress } from "../import/progress-store";
 
+/** Evento emitido durante el streaming de un job, incluyendo progreso, finalización o error. */
 export type StreamEvent =
   | { event: "progress"; data: { jobId: string; percent: number; phase: string; module: string; detail: string } }
   | { event: "complete"; data: { jobId: string; status: "completed"; redirectUrl: string } }
   | { event: "error-event"; data: { jobId: string; error: string } };
 
+/** Función emisora para enviar eventos SSE al cliente. */
 export type Emitter = (event: StreamEvent["event"], data: StreamEvent["data"]) => void;
 
 const POLL_INTERVAL_MS = 500;
@@ -42,6 +44,15 @@ const executingJobs = new Set<string>();
  *  - "failed": emit a final "error-event" with the error and stop.
  */
 
+/**
+ * Maneja el streaming del progreso de un job hacia el cliente SSE.
+ * Decide si ejecutar, observar o emitir el resultado final según el estado del job.
+ *
+ * @param jobId - Identificador único del job a procesar.
+ * @param initialJob - Estado inicial del job al momento de abrir el stream.
+ * @param emit - Función emisora para enviar eventos SSE al cliente.
+ * @returns Promesa que se resuelve cuando el job termina o el stream se cierra.
+ */
 export async function streamJob(
   jobId: string,
   initialJob: JobProgress,

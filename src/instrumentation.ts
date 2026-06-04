@@ -1,3 +1,6 @@
+/**
+ * Hook de instrumentación de Next.js: arranca el motor de schedules al iniciar el servidor Node.js.
+ */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") {
     return;

@@ -17,6 +17,7 @@ const envSchema = z.object({
   BACKUP_FORMAT_VERSION: z.string().min(1).default("1.0.0"),
 });
 
+/** Tipo inferido a partir del esquema Zod que define todas las variables de entorno necesarias. */
 export type AppwriteConfig = z.infer<typeof envSchema>;
 
 const configLogger = pino({
@@ -53,6 +54,7 @@ function resolveBackupDir(configuredDir: string): string {
   return lastResort;
 }
 
+/** Carga y valida las variables de entorno del proyecto origen. */
 export function loadAppwriteConfig(): AppwriteConfig {
   const result = envSchema.safeParse(process.env);
 
@@ -67,6 +69,7 @@ export function loadAppwriteConfig(): AppwriteConfig {
   return { ...config, BACKUP_OUTPUT_DIR: backupDir };
 }
 
+/** Carga y valida la configuración del proyecto destino para operaciones de importación. */
 export function loadTargetConfig(): AppwriteConfig {
   const result = envSchema.safeParse(process.env);
 

@@ -15,6 +15,10 @@ export function generateCsrfToken(sessionToken: string): string {
   return `${timestamp}:${signature}`;
 }
 
+/**
+ * Obtiene un token CSRF válido a partir de la sesión del usuario actual.
+ * @returns Token CSRF o null si no hay sesión activa.
+ */
 export async function getCsrfToken(): Promise<string | null> {
   try {
     const cookieStore = await cookies();
@@ -28,6 +32,11 @@ export async function getCsrfToken(): Promise<string | null> {
   }
 }
 
+/**
+ * Valida un token CSRF verificando su firma HMAC y que no haya expirado.
+ * @param token - Token CSRF a validar.
+ * @returns true si el token es válido, false en caso contrario.
+ */
 export async function validateCsrfToken(token: string | null | undefined): Promise<boolean> {
   if (!token) {
     return false;
@@ -75,6 +84,11 @@ export async function validateCsrfToken(token: string | null | undefined): Promi
   return timingSafeEqual(tokenBuffer, expectedBuffer);
 }
 
+/**
+ * Extrae el token CSRF de una request HTTP buscando en body (form o JSON) o header.
+ * @param request - Request HTTP entrante.
+ * @returns Token CSRF encontrado o null si no existe.
+ */
 export async function getCsrfTokenFromRequest(request: Request): Promise<string | null> {
   const contentType = request.headers.get("content-type") || "";
 

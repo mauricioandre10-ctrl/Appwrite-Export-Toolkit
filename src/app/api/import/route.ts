@@ -7,6 +7,7 @@ import { createJobId, createJob, updateJob } from "@/server/import/progress-stor
 
 export const dynamic = "force-dynamic";
 
+/** Lanza una tarea de importación desde un backup y devuelve el ID del trabajo. */
 export async function POST(request: Request) {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;

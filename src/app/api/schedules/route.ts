@@ -53,6 +53,7 @@ function validateCron(expression: string, timezone: string): string | null {
   }
 }
 
+/** Devuelve la lista de todos los schedules configurados con su próximo run calculado. */
 export async function GET(): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;
@@ -65,6 +66,7 @@ export async function GET(): Promise<NextResponse> {
   return NextResponse.json({ schedules: summaries });
 }
 
+/** Crea un nuevo schedule de exportación con la expresión cron y configuración dada. */
 export async function POST(request: Request): Promise<NextResponse> {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;

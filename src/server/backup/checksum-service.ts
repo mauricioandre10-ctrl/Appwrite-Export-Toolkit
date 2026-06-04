@@ -3,6 +3,7 @@ import { createReadStream } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
+/** Calcula el hash SHA-256 de un archivo en disco y lo devuelve como hex. */
 export async function sha256File(filePath: string): Promise<string> {
   const hash = createHash("sha256");
   const stream = createReadStream(filePath);
@@ -14,10 +15,12 @@ export async function sha256File(filePath: string): Promise<string> {
   return hash.digest("hex");
 }
 
+/** Calcula el hash SHA-256 de un string y lo devuelve como hex. */
 export function sha256String(value: string): string {
   return createHash("sha256").update(value).digest("hex");
 }
 
+/** Recorre recursivamente un directorio y devuelve los checksums SHA-256 de cada archivo, excluyendo manifest.json. */
 export async function collectFileChecksums(rootDir: string): Promise<Record<string, string>> {
   const checksums: Record<string, string> = {};
 

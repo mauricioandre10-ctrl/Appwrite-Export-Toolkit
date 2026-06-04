@@ -1,3 +1,6 @@
+/**
+ * Opciones de configuración para el mecanismo de reintentos con backoff exponencial.
+ */
 export type RetryOptions = {
   attempts?: number;
   baseDelayMs?: number;
@@ -6,6 +9,9 @@ export type RetryOptions = {
   onRetry?: (input: { attempt: number; delayMs: number; error: unknown }) => void | Promise<void>;
 };
 
+/**
+ * Ejecuta una operación asíncrona con reintentos y backoff exponencial si ocurre un error transitorio.
+ */
 export async function withRetry<T>(operation: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
   const attempts = options.attempts ?? 3;
   const baseDelayMs = options.baseDelayMs ?? 300;

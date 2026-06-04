@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+/** Campo de contraseña con botón para mostrar/ocultar el texto. */
 export function PasswordInput() {
   const [showPassword, setShowPassword] = useState(false);
 

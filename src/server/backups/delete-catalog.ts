@@ -14,6 +14,14 @@ export type BackupDeletionInfo = {
   fileCount: number;
 };
 
+/**
+ * Obtiene la información necesaria para eliminar un backup,
+ * incluyendo su tamaño total y cantidad de archivos.
+ *
+ * @param outputDir - Directorio raíz donde se encuentran los backups.
+ * @param backupId - Identificador del backup a consultar.
+ * @returns Información detallada del backup para procesos de eliminación.
+ */
 export async function getBackupDeletionInfo(outputDir: string, backupId: string): Promise<BackupDeletionInfo> {
   const backupRoot = resolveManagedBackupPath(outputDir, backupId);
   const manifestPath = path.join(backupRoot, "manifest.json");
@@ -38,6 +46,12 @@ export async function getBackupDeletionInfo(outputDir: string, backupId: string)
   };
 }
 
+/**
+ * Elimina un backup completo del disco, incluyendo todos sus archivos y directorios.
+ *
+ * @param outputDir - Directorio raíz donde se encuentran los backups.
+ * @param backupId - Identificador del backup a eliminar.
+ */
 export async function deleteBackup(outputDir: string, backupId: string): Promise<void> {
   const backupRoot = resolveManagedBackupPath(outputDir, backupId);
   await rm(backupRoot, { recursive: true, force: true });
@@ -65,6 +79,12 @@ async function measureDirectory(dirPath: string): Promise<{ size: number; files:
   return { size: totalSize, files: fileCount };
 }
 
+/**
+ * Convierte una cantidad de bytes a una cadena legible con la unidad adecuada (B, KB, MB, etc.).
+ *
+ * @param bytes - Cantidad de bytes a formatear.
+ * @returns Cadena con el valor formateado y su unidad.
+ */
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return "0 B";
   const units = ["B", "KB", "MB", "GB", "TB", "PB"];

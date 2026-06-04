@@ -1,3 +1,10 @@
+/**
+ * Configuración de Next.js.
+ *
+ * - `output: "standalone"` genera un build autónomo para Docker.
+ * - Define headers de seguridad (CSP, HSTS, X-Frame-Options, etc.)
+ *   aplicados a todas las rutas de la aplicación.
+ */
 import type { NextConfig } from "next";
 
 const securityHeaders = [

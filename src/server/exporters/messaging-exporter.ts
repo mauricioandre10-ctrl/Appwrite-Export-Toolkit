@@ -4,6 +4,7 @@ import { listAll, paginateRows } from "../utils/pagination";
 import { omitSensitiveFields } from "./sanitize";
 import type { JsonObject, ModuleExportResult } from "./types";
 
+/** Exporta proveedores, topics, suscriptores y mensajes de Messaging, redactando credenciales. */
 export async function exportMessaging(services: AppwriteServices, writer: BackupWriter): Promise<ModuleExportResult> {
   await writer.ensureDir("messaging");
 

@@ -15,18 +15,40 @@ import { exportDatabases } from "./database-exporter";
 import { exportStorage } from "./storage-exporter";
 import type { ModuleExportResult } from "./types";
 
+/**
+ * Lista de módulos que se pueden exportar desde Appwrite.
+ * Incluye autenticación, bases de datos y almacenamiento.
+ */
 export const exportableModules = ["auth", "databases", "storage"] as const;
 
+/**
+ * Tipo que representa un módulo individual que se puede exportar.
+ * Puede ser "auth", "databases" o "storage".
+ */
 export type ExportableModule = (typeof exportableModules)[number];
 
+/**
+ * Tipo que define la selección de módulos para exportar.
+ * Puede ser un módulo específico o "all" para exportar todos.
+ */
 export type ExportSelection = ExportableModule | "all";
 
+/**
+ * Tipo que representa el resumen de una exportación de backup.
+ * Contiene información sobre el backup creado, módulos exportados y estadísticas.
+ */
 export type BackupExportSummary = {
+  /** ID único del backup */
   backupId: string;
+  /** Ruta raíz donde se almacena el backup */
   backupRoot: string;
+  /** Lista de módulos que fueron exportados */
   modules: BackupModule[];
+  /** Conteos de elementos exportados por módulo */
   counts: BackupCounts;
+  /** Advertencias encontradas durante la exportación */
   warnings: string[];
+  /** Ruta al archivo manifest del backup */
   manifestPath: string;
 };
 
@@ -36,13 +58,19 @@ const EXPORT_WEIGHTS: Record<string, number> = {
   storage: 20,
 };
 
+// Pesos relativos de cada módulo para el cálculo de progreso.
+// databases (60%) pesa más porque es la parte más lenta y costosa;
+// auth y storage (20% cuno) son comparativamente rápidos.
 function computeExportPercent(modules: ExportableModule[], completedIndex: number): number {
   if (modules.length === 0) return 0;
   let weightSum = 0;
   let completedWeight = 0;
   for (let i = 0; i < modules.length; i++) {
+    // Si el módulo no está en el mapa, usamos 10 como valor por defecto.
     const w = EXPORT_WEIGHTS[modules[i]!] ?? 10;
     weightSum += w;
+    // Solo sumamos el peso de módulos cuyo índice es menor al actual,
+    // es decir, los que ya terminaron de procesarse.
     if (i < completedIndex) {
       completedWeight += w;
     }
@@ -50,6 +78,18 @@ function computeExportPercent(modules: ExportableModule[], completedIndex: numbe
   return Math.round((completedWeight / weightSum) * 100);
 }
 
+/**
+ * Orquesta el proceso completo de exportación de backup desde Appwrite.
+ * Maneja la exportación de módulos seleccionados, genera el manifest y calcula checksums.
+ *
+ * @param input - Objeto con los parámetros de configuración para la exportación
+ * @param input.selection - Selección de módulos a exportar (módulo específico o "all")
+ * @param input.config - Configuración de conexión con Appwrite
+ * @param input.services - Servicios configurados de Appwrite para realizar las llamadas API
+ * @param input.jobId - ID opcional del job para seguimiento de progreso
+ * @param input.onProgress - Callback opcional para reportar progreso de la exportación
+ * @returns Resumen completo de la exportación realizada con estadísticas y rutas
+ */
 export async function exportBackup(input: {
   selection: ExportSelection;
   config: AppwriteConfig;
@@ -145,6 +185,14 @@ export async function exportBackup(input: {
   return summary;
 }
 
+/**
+ * Parsea y valida una selección de exportación desde un string.
+ * Convierte el valor a un ExportSelection válido o lanza error si no es válido.
+ *
+ * @param value - String con la selección de módulos (puede ser "all", módulo específico o undefined)
+ * @returns La selección validada de exportación
+ * @throws Error si el valor no es un módulo válido
+ */
 export function parseExportSelection(value: string | undefined): ExportSelection {
   if (value === undefined || value === "all") {
     return "all";

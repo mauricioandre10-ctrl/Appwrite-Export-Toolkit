@@ -17,6 +17,7 @@ type RouteContext = {
   }>;
 };
 
+/** Descarga un backup existente como archivo `.tar.gz`. */
 export async function POST(request: Request, context: RouteContext) {
   const cookieStore = await cookies();
   const sessionToken = cookieStore.get(sessionCookieName)?.value;
