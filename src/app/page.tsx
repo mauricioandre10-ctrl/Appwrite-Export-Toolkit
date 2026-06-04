@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { loadAppwriteConfig } from "@/server/appwrite/config";
@@ -17,6 +18,7 @@ import { PasswordInput } from "./password-input";
 import { CsrfTokenInput } from "./csrf-token";
 import { sessionCookieName, getLoginConfig, createSessionToken, safeEqual, isValidSessionToken } from "@/server/auth/session";
 import { validateCsrfToken, getCsrfToken } from "@/server/auth/csrf";
+import { isRateLimited, recordFailedAttempt, resetAttempts } from "@/server/auth/rate-limit";
 
 /** Limpia mensajes de error para evitar filtrar paths del sistema al usuario. */
 function sanitizeErrorMessage(error: unknown, fallback: string): string {
@@ -982,14 +984,26 @@ async function deleteAction(formData: FormData) {
 async function loginAction(formData: FormData) {
   "use server";
 
+  const headerStore = await headers();
+  const ip = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim()
+    ?? headerStore.get("x-real-ip")
+    ?? "127.0.0.1";
+
+  if (isRateLimited(ip)) {
+    redirect("/?error=rate-limited");
+  }
+
   const loginConfig = getLoginConfig();
   const user = String(formData.get("user") ?? "");
   const password = String(formData.get("password") ?? "");
 
   // CSRF not required for login (first form submission)
   if (!loginConfig.ready || !safeEqual(user, loginConfig.user) || !safeEqual(password, loginConfig.password)) {
+    recordFailedAttempt(ip);
     redirect("/?error=invalid");
   }
+
+  resetAttempts(ip);
 
   const cookieStore = await cookies();
   const isSecure = process.env.NODE_ENV === "production" || process.env.COOKIE_SECURE === "1";

@@ -1,8 +1,20 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 
-const CSRF_SECRET = process.env.APP_CSRF_SECRET ?? process.env.APP_LOGIN_PASSWORD ?? "csrf-fallback-secret";
+const CSRF_SECRET = process.env.APP_CSRF_SECRET;
+if (!CSRF_SECRET) {
+  throw new Error(
+    "APP_CSRF_SECRET is required. Generate with: openssl rand -hex 32",
+  );
+}
 const TOKEN_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
+
+function getSecret(): string {
+  if (!CSRF_SECRET) {
+    throw new Error("APP_CSRF_SECRET is required");
+  }
+  return CSRF_SECRET;
+}
 
 /**
  * Genera un token CSRF stateless firmado con HMAC-SHA256.
@@ -26,7 +38,7 @@ const TOKEN_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour
 export function generateCsrfToken(sessionToken: string): string {
   const timestamp = Date.now().toString();
   const payload = `${sessionToken}:${timestamp}`;
-  const signature = createHmac("sha256", CSRF_SECRET).update(payload).digest("hex");
+  const signature = createHmac("sha256", getSecret()).update(payload).digest("hex");
   return `${timestamp}:${signature}`;
 }
 
@@ -86,7 +98,7 @@ export async function validateCsrfToken(token: string | null | undefined): Promi
 
   // Re-compute expected signature
   const payload = `${sessionToken}:${timestampStr}`;
-  const expectedSignature = createHmac("sha256", CSRF_SECRET).update(payload).digest("hex");
+  const expectedSignature = createHmac("sha256", getSecret()).update(payload).digest("hex");
 
   // Timing-safe comparison
   const tokenBuffer = Buffer.from(submittedSignature, "hex");
