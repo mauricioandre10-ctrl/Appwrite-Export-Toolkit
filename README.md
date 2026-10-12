@@ -181,6 +181,12 @@ Plataformas compatibles: EasyPanel, Dokploy, cualquier plataforma que soporte Do
 | `BACKUP_OUTPUT_DIR` | Directorio donde se escriben los backups | `/data/backups` (producción) o `./backups` (desarrollo) |
 | `BACKUP_FORMAT_VERSION` | Versión del formato de backup | `1.0.0` |
 
+### Opcionales (Backups)
+
+| Variable | Valor por defecto | Descripción |
+|----------|-------------------|-------------|
+| `BACKUP_MAX_RETENTION` | `5` | Máximo de copias de backup a conservar. Al completar un export, si se supera el límite se elimina automáticamente la copia más antigua. `0` desactiva la retención |
+
 ### Opcionales (Proyecto destino para importar)
 
 | Variable | Descripción |

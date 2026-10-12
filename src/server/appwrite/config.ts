@@ -15,6 +15,10 @@ const envSchema = z.object({
   APPWRITE_TARGET_API_KEY: z.string().optional(),
   BACKUP_OUTPUT_DIR: z.string().min(1).default("/data/backups"),
   BACKUP_FORMAT_VERSION: z.string().min(1).default("1.0.0"),
+  BACKUP_MAX_RETENTION: z.preprocess(
+    (value) => (value === undefined || value === "" ? undefined : value),
+    z.coerce.number().int().min(0).max(100).default(5),
+  ),
 });
 
 /** Tipo inferido a partir del esquema Zod que define todas las variables de entorno necesarias. */

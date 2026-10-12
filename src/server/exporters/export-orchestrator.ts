@@ -7,6 +7,8 @@ import { BackupWriter } from "../backup/backup-writer";
 import { collectFileChecksums } from "../backup/checksum-service";
 import { createBackupId, resolveBackupRoot } from "../backup/paths";
 import type { ExportModule } from "../backup/paths";
+import { pruneRetainedBackups } from "../backups/retention";
+import { logger } from "../utils/logger";
 import { createInitialManifest } from "../manifest/manifest-service";
 import type { BackupCounts, BackupModule } from "../types/backup";
 import { updateJob } from "../import/progress-store";
@@ -192,6 +194,13 @@ export async function exportBackup(input: {
   manifest.checksums = await collectFileChecksums(backupRoot);
 
   const manifestPath = await writer.writeJson("manifest.json", manifest);
+
+  try {
+    await pruneRetainedBackups(input.config.BACKUP_OUTPUT_DIR, input.config.BACKUP_MAX_RETENTION);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown retention error";
+    logger.warn({ error: message }, "Retention prune failed; export continues");
+  }
 
   const summary: BackupExportSummary = {
     backupId,
