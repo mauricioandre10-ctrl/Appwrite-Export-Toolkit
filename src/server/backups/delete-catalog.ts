@@ -58,6 +58,35 @@ export async function deleteBackup(outputDir: string, backupId: string): Promise
   await rm(backupRoot, { recursive: true, force: true });
 }
 
+/**
+ * Elimina múltiples backups de una sola vez, recolectando los IDs que fallaron.
+ *
+ * Cada ID se valida individualmente con `resolveManagedBackupPath`, por lo que un
+ * ID inválido o fuera del directorio configurado no aborta el resto del lote.
+ *
+ * @param outputDir - Directorio raíz donde se encuentran los backups.
+ * @param backupIds - Lista de identificadores de backups a eliminar.
+ * @returns Los IDs eliminados correctamente y los que fallaron.
+ */
+export async function deleteBackupBatch(
+  outputDir: string,
+  backupIds: string[],
+): Promise<{ deleted: string[]; failed: string[] }> {
+  const deleted: string[] = [];
+  const failed: string[] = [];
+
+  for (const backupId of backupIds) {
+    try {
+      await deleteBackup(outputDir, backupId);
+      deleted.push(backupId);
+    } catch {
+      failed.push(backupId);
+    }
+  }
+
+  return { deleted, failed };
+}
+
 async function measureDirectory(dirPath: string): Promise<{ size: number; files: number }> {
   let totalSize = 0;
   let fileCount = 0;

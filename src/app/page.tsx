@@ -9,13 +9,14 @@ import type { BackupSummary } from "@/server/backups/catalog";
 import { LoginSubmitButton } from "./loading-button";
 import { listBackupSummaries, resolveManagedBackupPath } from "@/server/backups/catalog";
 import { validateBackup } from "@/server/validators/backup-validator";
-import { deleteBackup, getBackupDeletionInfo, formatBytes } from "@/server/backups/delete-catalog";
+import { deleteBackup, deleteBackupBatch, getBackupDeletionInfo, formatBytes } from "@/server/backups/delete-catalog";
 import { ExportPanel } from "@/components/export-panel";
 import { ImportPanel } from "@/components/import-panel";
 import { SchedulesPanel } from "@/components/schedules-panel";
 import { BackupWarnings } from "@/components/backup-warnings";
 import { PasswordInput } from "./password-input";
 import { CsrfTokenInput } from "./csrf-token";
+import { BatchDeleteBar } from "./batch-delete-bar";
 import { sessionCookieName, getLoginConfig, createSessionToken, safeEqual, isValidSessionToken } from "@/server/auth/session";
 import { validateCsrfToken, getCsrfToken } from "@/server/auth/csrf";
 import { isRateLimited, recordFailedAttempt, resetAttempts } from "@/server/auth/rate-limit";
@@ -56,6 +57,9 @@ type PageProps = {
     tab?: string;
     deleteConfirm?: string;
     deleted?: string;
+    deleteBatchConfirm?: string;
+    deletedMultiple?: string;
+    deleteFailed?: string;
   }>;
 };
 
@@ -163,6 +167,10 @@ function DashboardShell({
 
         {params?.deleteConfirm !== undefined ? (
           <DeleteConfirmModal backupId={params.deleteConfirm} csrfToken={csrfToken} />
+        ) : null}
+
+        {params?.deleteBatchConfirm !== undefined ? (
+          <BatchDeleteConfirmModal ids={decodeBatchIds(params.deleteBatchConfirm)} csrfToken={csrfToken} />
         ) : null}
 
         {params?.deleted !== undefined ? (
@@ -379,6 +387,17 @@ function AlertPanel({
     );
   }
 
+  if (params?.deletedMultiple !== undefined) {
+    const failed = params.deleteFailed !== undefined ? `, ${params.deleteFailed} fallaron` : "";
+    return (
+      <PanelAlert
+        tone="success"
+        title="Backups eliminados"
+        message={`Se eliminaron ${params.deletedMultiple} backups${failed}.`}
+      />
+    );
+  }
+
   if (params?.actionError !== undefined) {
     return <PanelAlert tone="error" title="Accion fallida" message={params.actionError.replaceAll("_", " ")} />;
   }
@@ -471,13 +490,27 @@ function BackupHistory({ backups, csrfToken }: { backups: BackupSummary[]; csrfT
         <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-slate-300">{backups.length}</span>
       </div>
 
-      <div className="mt-6 max-h-[34rem] space-y-3 overflow-auto pr-1">
+      {backups.length > 0 ? (
+        <BatchDeleteBar csrfToken={csrfToken} listContainerId="backup-history-list" confirmAction={deleteBatchConfirmAction} />
+      ) : null}
+
+      <div id="backup-history-list" className="mt-6 max-h-[34rem] space-y-3 overflow-auto pr-1">
         {backups.map((backup) => (
           <div key={backup.backupId} className="rounded-2xl border border-white/10 bg-white/[0.04] p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="min-w-0">
-                <p className="break-all font-mono text-xs text-slate-300">{backup.backupId}</p>
-                <p className="mt-1 text-xs text-slate-500">{formatDate(backup.exportedAt)}</p>
+              <div className="flex min-w-0 items-start gap-3">
+                <input
+                  type="checkbox"
+                  name="backupIds"
+                  value={backup.backupId}
+                  form="backup-batch-form"
+                  aria-label={`Seleccionar backup ${backup.backupId}`}
+                  className="mt-1 size-4 shrink-0 accent-emerald-300"
+                />
+                <div className="min-w-0">
+                  <p className="break-all font-mono text-xs text-slate-300">{backup.backupId}</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatDate(backup.exportedAt)}</p>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <form
@@ -891,6 +924,70 @@ async function DeleteConfirmModal({ backupId, csrfToken }: { backupId: string; c
   );
 }
 
+/** Convierte el parametro de confirmacion (IDs separados por comas) en un arreglo de IDs. */
+function decodeBatchIds(value: string | string[] | undefined): string[] {
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => item.split(",")).filter(Boolean);
+  }
+  if (typeof value === "string" && value.length > 0) {
+    return value.split(",").filter(Boolean);
+  }
+  return [];
+}
+
+/** Modal de confirmacion para el borrado masivo: lista los backups seleccionados. */
+function BatchDeleteConfirmModal({ ids, csrfToken }: { ids: string[]; csrfToken?: string | null | undefined }) {
+  if (ids.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="mx-4 w-full max-w-lg rounded-[2rem] border border-red-300/30 bg-slate-950 p-8 shadow-2xl shadow-red-900/30">
+        <div className="flex items-center gap-3">
+          <div className="grid size-10 place-items-center rounded-full bg-red-400/20">
+            <TrashIcon />
+          </div>
+          <h2 className="text-xl font-black text-white">Eliminar {ids.length} backups</h2>
+        </div>
+
+        <p className="mt-4 text-sm text-red-300/80">
+          Se eliminaran permanentemente los siguientes backups. Esta accion no se puede deshacer.
+        </p>
+
+        <ul className="mt-4 max-h-44 space-y-1 overflow-auto rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+          {ids.map((id) => (
+            <li key={id} className="break-all font-mono text-xs text-slate-300">
+              {id}
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <Link
+            href="/"
+            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-center text-sm font-bold text-white transition hover:bg-white/10"
+          >
+            Cancelar
+          </Link>
+          <form action={deleteBatchAction} className="flex-1">
+            <CsrfTokenInput token={csrfToken} />
+            {ids.map((id) => (
+              <input key={id} name="backupIds" type="hidden" value={id} />
+            ))}
+            <button
+              type="submit"
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-red-300/40 bg-red-400/20 px-5 font-bold text-red-200 transition hover:bg-red-400/30"
+            >
+              <TrashIcon /> Eliminar {ids.length} backups
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Formatea una fecha ISO a formato local en espanol. */
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("es", {
@@ -978,6 +1075,50 @@ async function deleteAction(formData: FormData) {
   }
 
   redirect(`/?deleted=${encodeURIComponent(backupId)}`);
+}
+
+/** Server action: redirige al modal de confirmacion del borrado múltiple. */
+async function deleteBatchConfirmAction(formData: FormData) {
+  "use server";
+
+  await requireAuthenticated();
+  await requireCsrf(formData);
+
+  const backupIds = formData.getAll("backupIds").map(String).filter(Boolean);
+
+  if (backupIds.length === 0) {
+    redirect("/?actionError=Selecciona_al_menos_un_backup");
+  }
+
+  redirect(`/?deleteBatchConfirm=${encodeURIComponent(backupIds.join(","))}`);
+}
+
+/** Server action: elimina varios backups del disco en lote y redirige con confirmacion. */
+async function deleteBatchAction(formData: FormData) {
+  "use server";
+
+  await requireAuthenticated();
+  await requireCsrf(formData);
+
+  const backupIds = formData.getAll("backupIds").map(String).filter(Boolean);
+
+  if (backupIds.length === 0) {
+    redirect("/?actionError=Selecciona_al_menos_un_backup");
+  }
+
+  const config = loadAppwriteConfig();
+
+  let deleted: string[];
+  let failed: string[];
+  try {
+    ({ deleted, failed } = await deleteBackupBatch(config.BACKUP_OUTPUT_DIR, backupIds));
+  } catch (error) {
+    const reason = sanitizeErrorMessage(error, "batch_delete_failed");
+    redirect(`/?actionError=${encodeURIComponent(reason)}`);
+  }
+
+  const failedQuery = failed.length > 0 ? `&deleteFailed=${failed.length}` : "";
+  redirect(`/?deletedMultiple=${deleted.length}${failedQuery}`);
 }
 
 /** Server action: autentica al usuario y crea la cookie de sesion. */
